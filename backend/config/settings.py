@@ -46,10 +46,15 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-in-pro
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
+# ALLOWED_HOSTS: use RENDER_EXTERNAL_HOSTNAME on Render, merge with env
 _ALLOWED = os.environ.get('ALLOWED_HOSTS', '').strip()
 if not _ALLOWED:
     _ALLOWED = 'localhost,127.0.0.1,.onrender.com'
 ALLOWED_HOSTS = [h.strip() for h in _ALLOWED.split(',') if h.strip()]
+# Render sets RENDER_EXTERNAL_HOSTNAME automatically - must be in ALLOWED_HOSTS
+_RENDER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if _RENDER_HOST and _RENDER_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_RENDER_HOST)
 
 
 # Application definition
