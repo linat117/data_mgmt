@@ -1,6 +1,9 @@
 """
 Custom JWT auth - accepts email and password, returns tokens.
 """
+import json
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,18 +11,27 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class CustomLoginView(APIView):
-    """Accept JSON body with email and password. No DRF serializer validation."""
+    """Accept JSON body with email and password. CSRF exempt for cross-origin API calls."""
 
     permission_classes = []  # Allow unauthenticated
     authentication_classes = []
 
     def post(self, request):
         try:
-            # Accept both JSON and form data
-            if request.content_type and 'json' in request.content_type:
-                data = request.data
-            else:
+            # Parse JSON body - use request.body directly to avoid any parser issues
+            data = {}
+            if request.body:
+                try:
+                    body = request.body.decode('utf-8') if isinstance(request.body, bytes) else request.body
+                    data = json.loads(body)
+                except json.JSONDecodeError:
+                    return Response(
+                        {'detail': 'Invalid JSON body'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            if not data:
                 data = getattr(request, 'data', None) or {}
 
             email = (data.get('email') or data.get('username') or '').strip()
