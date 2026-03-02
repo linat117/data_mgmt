@@ -1,12 +1,9 @@
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.routers import DefaultRouter
 from apps.users.views import UserViewSet
-
+from apps.users.auth_views import CustomTokenObtainPairView
 from apps.users.dashboard_views import DashboardStatsView
 
 router = DefaultRouter()
@@ -14,7 +11,7 @@ router.register(r'users', UserViewSet, basename='user')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/v1/auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/v1/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/v1/dashboard/stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
     path('api/v1/', include(router.urls)),
