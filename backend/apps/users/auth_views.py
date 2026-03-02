@@ -1,28 +1,23 @@
 """
-Custom JWT auth - accepts 'email' in request and returns clear errors.
+Custom JWT auth - explicitly accepts 'email' and 'password' in request body.
 """
+from rest_framework import serializers, exceptions
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Accept 'email' or 'username' in request body."""
+class CustomTokenObtainPairSerializer(serializers.Serializer):
+    """Explicitly use email and password - no username field."""
+    email = serializers.EmailField(write_only=True)
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
     def validate(self, attrs):
-        # Support both 'email' and 'username' (some clients send username with email value)
-        email = attrs.get('email') or attrs.get('username', '').strip()
+        email = attrs.get('email', '').strip()
         password = attrs.get('password', '')
-
-        if not email or not password:
-            from rest_framework import exceptions
-            raise exceptions.AuthenticationFailed(
-                'Email and password are required',
-                code='missing_credentials'
-            )
 
         user = authenticate(
             self.context.get('request'),
@@ -31,20 +26,18 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         )
 
         if user is None:
-            from rest_framework import exceptions
             raise exceptions.AuthenticationFailed(
                 'No active account found with the given credentials',
                 code='invalid_credentials'
             )
 
         if not getattr(user, 'is_active', True):
-            from rest_framework import exceptions
             raise exceptions.AuthenticationFailed(
                 'Account is disabled',
                 code='user_disabled'
             )
 
-        refresh = self.get_token(user)
+        refresh = RefreshToken.for_user(user)
         return {
             'refresh': str(refresh),
             'access': str(refresh.access_token),
