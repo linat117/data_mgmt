@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model
 
 
 class HealthView(APIView):
@@ -30,18 +31,17 @@ class CustomLoginView(APIView):
 
     def post(self, request):
         try:
-            # Prefer request.data (DRF-parsed), fallback to manual JSON parse
-            data = getattr(request, 'data', None)
-            if not data and request.body:
+            # Parse body manually to avoid DRF parser failing on edge cases (empty body, proxy quirks)
+            data = {}
+            if request.body:
                 try:
                     body = request.body.decode('utf-8') if isinstance(request.body, bytes) else request.body
-                    data = json.loads(body)
+                    data = json.loads(body) or {}
                 except json.JSONDecodeError:
                     return Response(
                         {'detail': 'Invalid JSON body'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-            data = data or {}
 
             email = (data.get('email') or data.get('username') or '').strip()
             password = data.get('password') or ''
@@ -55,7 +55,8 @@ class CustomLoginView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            user = authenticate(request, username=email, password=password)
+            User = get_user_model()
+            user = authenticate(request, **{User.USERNAME_FIELD: email}, password=password)
 
             if user is None:
                 return Response(
