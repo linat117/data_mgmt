@@ -46,7 +46,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-in-pro
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+_ALLOWED = os.environ.get('ALLOWED_HOSTS', '').strip()
+if not _ALLOWED:
+    _ALLOWED = 'localhost,127.0.0.1,.onrender.com'
+ALLOWED_HOSTS = [h.strip() for h in _ALLOWED.split(',') if h.strip()]
 
 
 # Application definition
