@@ -25,7 +25,40 @@ const ClientRegistrations = ({ openModalRef }) => {
         counseling_given: '',
         demonstration_shown: '',
         anything_additional: '',
-        problem_faced_by_mm: ''
+        problem_faced_by_mm: '',
+        // SPSS-aligned extra fields
+        spss_start_date: '',
+        spss_first_name: '',
+        spss_last_name: '',
+        spss_marital_status_code: '',
+        spss_job: '',
+        spss_payment: '',
+        spss_number_child_deaths: '',
+        spss_number_children_sd: '',
+        spss_medical_record: '',
+        spss_pregnant_record: '',
+        spss_lactate: '',
+        spss_nutrition_status: '',
+        spss_starting_month: '',
+        spss_first_pv_date: '',
+        spss_number_miscarriages: '',
+        spss_immunization_count: '',
+        spss_delivery_status: '',
+        spss_delivery_date: '',
+        spss_child_death_after: '',
+        spss_breastfeeding_status: '',
+        spss_rh_factor: '',
+        spss_no_antenatal: '',
+        spss_no_postnatal: '',
+        spss_child_no_after: '',
+        spss_second_preg_date: '',
+        spss_second_pregnancy: '',
+        spss_second_breastfeeding: '',
+        spss_second_antenatal: '',
+        spss_second_postnatal: '',
+        spss_second_immunization: '',
+        spss_second_delivery_date: '',
+        spss_number_children_after: ''
     });
 
     const fetchClients = async () => {
@@ -63,14 +96,8 @@ const ClientRegistrations = ({ openModalRef }) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        if (name === 'mentor_mother_select') {
-            setFormData(prev => ({ ...prev, mentor_mother_name: value === OTHER_MENTOR ? '' : value }));
-            return;
-        }
         setFormData(prev => ({ ...prev, [name]: value }));
     };
-
-    const mentorSelectValue = mentorMotherNames.includes(formData.mentor_mother_name) ? formData.mentor_mother_name : (formData.mentor_mother_name ? OTHER_MENTOR : '');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -79,11 +106,63 @@ const ClientRegistrations = ({ openModalRef }) => {
             return;
         }
         try {
+            const numericFields = [
+                'spss_marital_status_code',
+                'spss_payment',
+                'spss_number_child_deaths',
+                'spss_number_children_sd',
+                'spss_medical_record',
+                'spss_pregnant_record',
+                'spss_lactate',
+                'spss_nutrition_status',
+                'spss_number_miscarriages',
+                'spss_immunization_count',
+                'spss_delivery_status',
+                'spss_child_death_after',
+                'spss_breastfeeding_status',
+                'spss_rh_factor',
+                'spss_no_antenatal',
+                'spss_no_postnatal',
+                'spss_child_no_after',
+                'spss_second_pregnancy',
+                'spss_second_breastfeeding',
+                'spss_second_antenatal',
+                'spss_second_postnatal',
+                'spss_second_immunization',
+                'spss_number_children_after',
+            ];
+
+            const decimalFields = ['weight', 'muac'];
+
+            const dateFields = [
+                'spss_start_date',
+                'spss_first_pv_date',
+                'spss_delivery_date',
+                'spss_second_preg_date',
+                'spss_second_delivery_date',
+            ];
+
             const payload = {
                 ...formData,
                 total_green_cases: Number(formData.total_green_cases) || 0,
-                total_blue_cases: Number(formData.total_blue_cases) || 0
+                total_blue_cases: Number(formData.total_blue_cases) || 0,
             };
+
+            numericFields.forEach((field) => {
+                const value = formData[field];
+                payload[field] = value === '' ? null : Number(value);
+            });
+
+            decimalFields.forEach((field) => {
+                const value = formData[field];
+                payload[field] = value === '' ? null : Number(value);
+            });
+
+            dateFields.forEach((field) => {
+                const value = formData[field];
+                payload[field] = value || null;
+            });
+
             await createClient(payload);
             setShowModal(false);
             fetchClients();
@@ -105,32 +184,52 @@ const ClientRegistrations = ({ openModalRef }) => {
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50">
                                 <tr>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Total Green</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Total Blue</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Name</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Age/Sex</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Folder</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">MUAC</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Total Green</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Total Blue</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">S.n</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Name</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Age</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Sex</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Folder</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Address</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Weight (kg)</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">MUAC (cm)</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Identified problem</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Counseling given</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Demonstration shown by MM</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Anything additional</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Problem faced by MMs</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {clients.map((client) => (
-                                    <tr key={client.id} className="hover:bg-neutral-50">
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">{client.date}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{client.total_green_cases ?? '-'}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{client.total_blue_cases ?? '-'}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">{client.name}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{client.age} / {client.sex}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{client.folder_number || '-'}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{client.muac || '-'}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{client.mentor_mother_name}</td>
+                                {clients.map((client, index) => (
+                                    <tr key={client.id} className="hover:bg-neutral-50 align-top">
+                                        <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{client.mentor_mother_name}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{client.date}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.total_green_cases ?? '-'}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.total_blue_cases ?? '-'}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{index + 1}</td>
+                                        <td className="px-3 py-3 text-sm font-medium text-primary-600 sm:px-4 sm:py-3 whitespace-nowrap">{client.name}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.age}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.sex}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.folder_number || '-'}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.address}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.weight ?? '-'}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.muac ?? '-'}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.identified_problem}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.counseling_given}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.demonstration_shown || ''}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.anything_additional || ''}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.problem_faced_by_mm || ''}</td>
                                     </tr>
                                 ))}
                                 {clients.length === 0 && (
                                     <tr>
-                                        <td colSpan="8" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-6">No registrations found.</td>
+                                        <td colSpan="17" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
+                                            No registrations found.
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>
@@ -159,14 +258,14 @@ const ClientRegistrations = ({ openModalRef }) => {
                                         <form onSubmit={handleSubmit} className="mt-4 sm:mt-6 grid grid-cols-1 gap-y-4 sm:gap-y-6 gap-x-4 sm:grid-cols-2">
                                             <div>
                                                 <label className="block text-sm font-medium text-neutral-700">Mentor Mother Name</label>
-                                                <select name="mentor_mother_select" value={mentorSelectValue} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border">
-                                                    <option value="">— Select or type below —</option>
-                                                    {mentorMotherNames.map((n) => <option key={n} value={n}>{n}</option>)}
-                                                    <option value={OTHER_MENTOR}>Other (type below)</option>
-                                                </select>
-                                                {(mentorSelectValue === OTHER_MENTOR || (formData.mentor_mother_name && !mentorMotherNames.includes(formData.mentor_mother_name))) && (
-                                                    <input type="text" name="mentor_mother_name" value={formData.mentor_mother_name} onChange={handleChange} placeholder="Enter mentor mother name" className="mt-2 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
-                                                )}
+                                                <input
+                                                    type="text"
+                                                    name="mentor_mother_name"
+                                                    value={formData.mentor_mother_name}
+                                                    onChange={handleChange}
+                                                    placeholder="Enter mentor mother name"
+                                                    className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border"
+                                                />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-neutral-700">Date</label>
@@ -229,10 +328,141 @@ const ClientRegistrations = ({ openModalRef }) => {
                                                 <label className="block text-sm font-medium text-neutral-700">Anything additional</label>
                                                 <textarea name="anything_additional" value={formData.anything_additional} onChange={handleChange} rows="2" className="mt-1 block w-full border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3"></textarea>
                                             </div>
-                                            <div className="sm:col-span-2">
+                                        <div className="sm:col-span-2">
                                                 <label className="block text-sm font-medium text-neutral-700">Problem faced by MMs</label>
                                                 <textarea name="problem_faced_by_mm" value={formData.problem_faced_by_mm} onChange={handleChange} rows="2" className="mt-1 block w-full border border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3"></textarea>
                                             </div>
+                                        <div className="sm:col-span-2 pt-2 border-t border-neutral-200">
+                                            <h4 className="text-sm font-semibold text-neutral-800 mb-2">Additional SPSS Fields</h4>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Started Date (SDate)</label>
+                                            <input type="date" name="spss_start_date" value={formData.spss_start_date} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">First Name (FName)</label>
+                                            <input type="text" name="spss_first_name" value={formData.spss_first_name} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Last Name (LName)</label>
+                                            <input type="text" name="spss_last_name" value={formData.spss_last_name} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Marital Status (MStatus)</label>
+                                            <input type="number" name="spss_marital_status_code" value={formData.spss_marital_status_code} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Client Job (Job)</label>
+                                            <input type="text" name="spss_job" value={formData.spss_job} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Client Payment (Payment)</label>
+                                            <input type="number" name="spss_payment" value={formData.spss_payment} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Number of Child Deaths (NoCDeath)</label>
+                                            <input type="number" name="spss_number_child_deaths" value={formData.spss_number_child_deaths} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Number of Children (NoChildSD)</label>
+                                            <input type="number" name="spss_number_children_sd" value={formData.spss_number_children_sd} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Medical Record (MRecord)</label>
+                                            <input type="number" name="spss_medical_record" value={formData.spss_medical_record} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Pregnant Record (PLactate)</label>
+                                            <input type="number" name="spss_pregnant_record" value={formData.spss_pregnant_record} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Lactate (Lactate)</label>
+                                            <input type="number" name="spss_lactate" value={formData.spss_lactate} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Nutritional Status (Nutrisional)</label>
+                                            <input type="number" name="spss_nutrition_status" value={formData.spss_nutrition_status} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Starting Month (SPmonth)</label>
+                                            <input type="text" name="spss_starting_month" value={formData.spss_starting_month} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">First Pregnant Visit Date (FristPVDate)</label>
+                                            <input type="date" name="spss_first_pv_date" value={formData.spss_first_pv_date} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Number of Miscarriage (NoMiscarri)</label>
+                                            <input type="number" name="spss_number_miscarriages" value={formData.spss_number_miscarriages} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Immunization (Imunization)</label>
+                                            <input type="number" name="spss_immunization_count" value={formData.spss_immunization_count} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Delivery Status (DeliveryS)</label>
+                                            <input type="number" name="spss_delivery_status" value={formData.spss_delivery_status} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Delivery Date (DeliveryD)</label>
+                                            <input type="date" name="spss_delivery_date" value={formData.spss_delivery_date} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Child Death After (CDeathAFN)</label>
+                                            <input type="number" name="spss_child_death_after" value={formData.spss_child_death_after} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Breastfeeding (BreastF)</label>
+                                            <input type="number" name="spss_breastfeeding_status" value={formData.spss_breastfeeding_status} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">RH Factor (RHFactor)</label>
+                                            <input type="number" name="spss_rh_factor" value={formData.spss_rh_factor} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">No. Antenatal (NoAntenat)</label>
+                                            <input type="number" name="spss_no_antenatal" value={formData.spss_no_antenatal} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">No. Postnatal (NoPostnata)</label>
+                                            <input type="number" name="spss_no_postnatal" value={formData.spss_no_postnatal} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Child No. After (ChildNOAF)</label>
+                                            <input type="number" name="spss_child_no_after" value={formData.spss_child_no_after} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Second Date Pregnant (SDatePreg)</label>
+                                            <input type="date" name="spss_second_preg_date" value={formData.spss_second_preg_date} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Second Pregnancy (SPregnanc)</label>
+                                            <input type="number" name="spss_second_pregnancy" value={formData.spss_second_pregnancy} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Second Breastfeeding (SPBreastF)</label>
+                                            <input type="number" name="spss_second_breastfeeding" value={formData.spss_second_breastfeeding} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Second Antenatal (SAntenatal)</label>
+                                            <input type="number" name="spss_second_antenatal" value={formData.spss_second_antenatal} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Second Postnatal (SPostnatal)</label>
+                                            <input type="number" name="spss_second_postnatal" value={formData.spss_second_postnatal} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Second Immunization (SpImunizati)</label>
+                                            <input type="number" name="spss_second_immunization" value={formData.spss_second_immunization} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">Second Delivery Date (SPDeliveryD)</label>
+                                            <input type="date" name="spss_second_delivery_date" value={formData.spss_second_delivery_date} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-neutral-700">No. Children After (Nochildefte)</label>
+                                            <input type="number" name="spss_number_children_after" value={formData.spss_number_children_after} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        </div>
                                             <div className="sm:col-span-2 flex flex-col sm:flex-row justify-end mt-4 sm:space-x-3">
                                                 <button type="button" onClick={() => setShowModal(false)} className="w-full sm:w-auto mb-3 sm:mb-0 inline-flex justify-center rounded-md border border-neutral-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-neutral-700 hover:bg-neutral-50 sm:text-sm">
                                                     Cancel

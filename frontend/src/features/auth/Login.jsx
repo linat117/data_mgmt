@@ -42,11 +42,20 @@ const Login = () => {
 
             navigate('/dashboard');
         } catch (err) {
-            if (err.response && err.response.data && err.response.data.detail) {
-                setError(err.response.data.detail);
-            } else {
-                setError('Login failed. Please check your credentials.');
+            const data = err.response?.data;
+            let msg = null;
+            if (data) {
+                msg = data.detail || data.message || (typeof data === 'string' ? data : null);
+                if (!msg && typeof data === 'object') {
+                    const firstKey = Object.keys(data)[0];
+                    if (firstKey) msg = Array.isArray(data[firstKey]) ? data[firstKey][0] : String(data[firstKey]);
+                }
+                if (typeof data === 'object' && data.received_keys) {
+                    msg += ` (received: ${JSON.stringify(data.received_keys)})`;
+                }
             }
+            if (!msg && err.code === 'ERR_NETWORK') msg = 'Cannot reach server. Check that the API is running and CORS is configured.';
+            setError(msg || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
@@ -80,6 +89,7 @@ const Login = () => {
                                 <input
                                     type="email"
                                     required
+                                    autoComplete="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="focus:ring-primary-500 focus:border-primary-500 block w-full pl-10 sm:text-sm border-neutral-300 rounded-md py-2 px-3 border"
@@ -97,6 +107,7 @@ const Login = () => {
                                 <input
                                     type="password"
                                     required
+                                    autoComplete="current-password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="focus:ring-primary-500 focus:border-primary-500 block w-full pl-10 sm:text-sm border-neutral-300 rounded-md py-2 px-3 border"

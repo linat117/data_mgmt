@@ -46,15 +46,10 @@ const Records = () => {
     const openModalRef = useRef(null);
 
     const handleAddRecord = () => {
-        if (openModalRef.current) {
+        // Only allow adding through the single unified Client Registration form.
+        if (location.pathname.includes('/records/clients') && openModalRef.current) {
             openModalRef.current();
         }
-    };
-
-    const getAddLabel = () => {
-        if (location.pathname.includes('/reports')) return 'Add MCH Report';
-        if (location.pathname.includes('/plans')) return 'Add Weekly Plan';
-        return 'Add Client';
     };
 
     return (
@@ -66,16 +61,18 @@ const Records = () => {
                         View, filter, and manage Mentor Mother data, client registrations, and weekly plans.
                     </p>
                 </div>
-                <div className="flex-shrink-0">
-                    <button
-                        type="button"
-                        onClick={handleAddRecord}
-                        className="w-full sm:w-auto inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                    >
-                        <Plus className="-ml-0.5 mr-2 h-4 w-4 flex-shrink-0" />
-                        {getAddLabel()}
-                    </button>
-                </div>
+                {location.pathname.includes('/records/clients') && (
+                    <div className="flex-shrink-0">
+                        <button
+                            type="button"
+                            onClick={handleAddRecord}
+                            className="w-full sm:w-auto inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                        >
+                            <Plus className="-ml-0.5 mr-2 h-4 w-4 flex-shrink-0" />
+                            Add Record
+                        </button>
+                    </div>
+                )}
             </div>
 
             <Tabs />

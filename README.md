@@ -60,5 +60,6 @@ Frontend runs at [http://localhost:5173](http://localhost:5173).
 
 ## Documentation
 
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** – Deploy to Render + Vercel + Neon (step-by-step)
 - `frontend/README.md` – Frontend setup and scripts
 - `backend/NEON.md` – Using Neon (Postgres) as database

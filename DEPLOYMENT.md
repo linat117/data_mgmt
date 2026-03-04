@@ -39,7 +39,7 @@ Step-by-step guide to deploy DataM for free using Render (backend), Vercel (fron
 | **Region** | Choose nearest |
 | **Root Directory** | `backend` |
 | **Runtime** | Python 3 |
-| **Build Command** | `pip install -r requirements.txt` |
+| **Build Command** | `pip install -r requirements.txt && python manage.py migrate --no-input` |
 | **Start Command** | `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT` |
 
 5. Click **Advanced** and add environment variables:
@@ -49,25 +49,31 @@ Step-by-step guide to deploy DataM for free using Render (backend), Vercel (fron
 | `DATABASE_URL` | Your Neon connection string |
 | `SECRET_KEY` | Random string (e.g. from `python -c "import secrets; print(secrets.token_hex(32))"`) |
 | `DEBUG` | `False` |
-| `ALLOWED_HOSTS` | `your-app.onrender.com` (replace with your Render URL) |
+| `ALLOWED_HOSTS` | *(optional)* Render sets `RENDER_EXTERNAL_HOSTNAME` automatically; settings.py uses it. Only set if you add a custom domain. |
 | `CORS_ALLOWED_ORIGINS` | `https://your-frontend.vercel.app` (add after Part 3) |
 
 6. Click **Create Web Service**.
 
-### 2.2 Run Migrations
+### 2.2 Migrations (runs automatically)
 
-After the first deploy:
+Migrations run automatically during each deploy via the build command. No Shell needed.
 
-1. In Render, open your service.
-2. Go to **Shell**.
-3. Run:
+### 2.3 Create admin user (first time only)
+
+Create the admin user locally – it’s stored in Neon and will work with your deployed app:
+
+1. Locally, ensure `backend/.env` has your **Neon** connection string:
+   ```env
+   DATABASE_URL=postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require
+   ```
+2. From the project root, run:
    ```bash
-   python manage.py migrate
+   cd backend
    python manage.py createsuperuser
    ```
-4. Enter email and password for the admin user.
+3. Enter email and password when prompted.
 
-### 2.3 Get Backend URL
+### 2.4 Get Backend URL
 
 Your API will be: `https://datam-backend.onrender.com` (or your chosen name).
 
@@ -122,10 +128,10 @@ Add `/api/v1/` for API calls, e.g. `https://datam-backend.onrender.com/api/v1/`.
 - [ ] Neon connection string in Render `DATABASE_URL`
 - [ ] `SECRET_KEY` set in Render (random, not default)
 - [ ] `DEBUG=False` in Render
-- [ ] `ALLOWED_HOSTS` includes Render URL
+- [ ] `ALLOWED_HOSTS` – not required on Render (RENDER_EXTERNAL_HOSTNAME is used automatically)
 - [ ] `CORS_ALLOWED_ORIGINS` includes Vercel URL
-- [ ] Migrations run in Render Shell
-- [ ] Superuser created
+- [ ] Migrations run on each deploy (built into build command)
+- [ ] Superuser created locally (`python manage.py createsuperuser`)
 - [ ] `VITE_API_URL` in Vercel points to `https://YOUR-RENDER-URL.onrender.com/api/v1`
 
 ---
@@ -137,6 +143,30 @@ Add `/api/v1/` for API calls, e.g. `https://datam-backend.onrender.com/api/v1/`.
 | Frontend | `https://your-project.vercel.app` |
 | API | `https://your-backend.onrender.com/api/v1/` |
 | Login | `https://your-backend.onrender.com/api/v1/auth/login/` |
+
+---
+
+## Troubleshooting
+
+### Login returns 400 Bad Request
+
+1. **Check if the backend is reachable**: Open in a browser or with curl:
+   ```
+   https://YOUR-RENDER-URL.onrender.com/api/v1/health/
+   ```
+   You should see `{"ok": true}`. If not, the app or Render service may be down.
+
+2. **Inspect the response body** (DevTools → Network → login request → Response):
+   - If **JSON** with `detail` and `received_keys`: the view is running; `received_keys` shows what the server parsed. Expect `["email","password"]`. If empty or different, the request body may not be reaching the view correctly.
+   - If **HTML** or 400 on even `/api/v1/health/`: typically `ALLOWED_HOSTS`. Settings now auto-add `RENDER_EXTERNAL_HOSTNAME` on Render. Ensure you redeploy after updating settings.
+
+3. **Verify env on Render**: `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `VITE_API_URL` all correct.
+
+### Health endpoint
+
+| URL | Purpose |
+|-----|---------|
+| `GET /api/v1/health/` | No auth. Returns `{"ok": true}` if the app is up. |
 
 ---
 

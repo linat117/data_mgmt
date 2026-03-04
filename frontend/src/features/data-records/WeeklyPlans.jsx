@@ -82,7 +82,8 @@ const WeeklyPlans = ({ openModalRef }) => {
 
     return (
         <div className="min-w-0">
-            <h2 className="text-lg font-medium text-neutral-800 sm:text-xl mb-4">Weekly Plans (Karoora Guyyaa Fi Torbanii)</h2>
+        <h2 className="text-lg font-medium text-neutral-800 sm:text-xl mb-1">Maternal and Child Health Project (MCHP)</h2>
+        <p className="text-sm text-neutral-700 mb-4">Karoora Guyyaa Fi Torbanii / ዕለታዊ እና ሳምንታዊ ዕቅድ</p>
 
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
                 {loading ? (
@@ -92,24 +93,32 @@ const WeeklyPlans = ({ openModalRef }) => {
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50">
                                 <tr>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date / Day</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client Name</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">District</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Objective</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Day</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client Name (Maqaa mamilaa)</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Content (Qabiyyee)</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Objective (Kayyoo)</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Observation (Yaada)</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">District (Gooxii)</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
                                 {plans.map((plan) => (
                                     <tr key={plan.id} className="hover:bg-neutral-50">
-                                        <td className="px-3 py-3 text-sm text-neutral-900 sm:px-6 sm:py-4">{plan.date} ({plan.day_of_week})</td>
-                                        <td className="px-3 py-3 text-sm font-medium text-primary-600 sm:px-6 sm:py-4">{plan.client_name}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4">{plan.district}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 truncate max-w-[150px] sm:max-w-xs sm:px-6 sm:py-4">{plan.objective}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{plan.date}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{plan.day_of_week}</td>
+                                        <td className="px-3 py-3 text-sm font-medium text-primary-600 sm:px-4 sm:py-3">{plan.client_name}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{plan.content}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{plan.objective}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{plan.observation}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{plan.district}</td>
                                     </tr>
                                 ))}
                                 {plans.length === 0 && (
                                     <tr>
-                                        <td colSpan="4" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-6">No plans found.</td>
+                                        <td colSpan="7" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
+                                            No plans found.
+                                        </td>
                                     </tr>
                                 )}
                             </tbody>

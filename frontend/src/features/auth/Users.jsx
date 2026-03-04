@@ -232,7 +232,7 @@ const Users = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-neutral-700">Password</label>
-                                        <input type="password" required name="password" value={formData.password} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
+                                        <input type="password" required name="password" autoComplete="new-password" value={formData.password} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-neutral-700">Role</label>
@@ -288,7 +288,7 @@ const Users = () => {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-neutral-700">New password (optional)</label>
-                                        <input type="password" name="password" value={editFormData.password} onChange={handleEditChange} placeholder="Leave blank to keep current" className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" minLength={8} />
+                                        <input type="password" name="password" autoComplete="new-password" value={editFormData.password} onChange={handleEditChange} placeholder="Leave blank to keep current" className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" minLength={8} />
                                     </div>
                                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:pt-4">
                                         <button type="button" onClick={() => setEditUser(null)} className="w-full sm:w-auto bg-white py-2 px-4 border border-neutral-300 rounded-md shadow-sm text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">

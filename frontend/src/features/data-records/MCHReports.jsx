@@ -10,6 +10,7 @@ const MCHReports = ({ openModalRef }) => {
     const [mentorMotherNames, setMentorMotherNames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [viewReport, setViewReport] = useState(null);
     const [formData, setFormData] = useState({
         mentor_mother_name: '',
         date: new Date().toISOString().split('T')[0],
@@ -144,7 +145,11 @@ const MCHReports = ({ openModalRef }) => {
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
                                 {reports.map((report) => (
-                                    <tr key={report.id} className="hover:bg-neutral-50">
+                                <tr
+                                        key={report.id}
+                                        className="hover:bg-neutral-50 cursor-pointer"
+                                        onClick={() => setViewReport(report)}
+                                    >
                                         <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">{report.date}</td>
                                         <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">{report.mentor_mother_name}</td>
                                         <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{report.total_green ?? '-'}</td>
@@ -258,6 +263,119 @@ const MCHReports = ({ openModalRef }) => {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {viewReport && (
+                <div className="fixed z-20 inset-0 overflow-y-auto p-4 sm:p-0">
+                    <div className="flex min-h-full sm:min-h-screen items-center justify-center">
+                        <div className="fixed inset-0 transition-opacity" onClick={() => setViewReport(null)}>
+                            <div className="absolute inset-0 bg-neutral-500 opacity-75"></div>
+                        </div>
+                        <div className="relative bg-white rounded-lg text-left overflow-hidden shadow-xl w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+                            <div className="px-4 pt-5 pb-3 border-b border-neutral-200 flex-shrink-0">
+                                <div className="flex justify-between items-start gap-2">
+                                    <div>
+                                        <h3 className="text-base sm:text-lg leading-6 font-medium text-neutral-900">
+                                            Maternal and Child Health Services Report
+                                        </h3>
+                                        <div className="mt-3 space-y-1 text-sm text-neutral-800">
+                                            <div className="flex flex-wrap gap-4">
+                                                <span>
+                                                    <span className="font-semibold">Mentor Mother’s Name:</span>{' '}
+                                                    {viewReport.mentor_mother_name}
+                                                </span>
+                                                <span>
+                                                    <span className="font-semibold">Date:</span> {viewReport.date}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-4">
+                                                <span>
+                                                    <span className="font-semibold">Total case: Green (Mother)</span>{' '}
+                                                    {viewReport.total_green ?? 0}
+                                                </span>
+                                                <span>
+                                                    <span className="font-semibold">Total case: Blue (Children)</span>{' '}
+                                                    {viewReport.total_blue ?? 0}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setViewReport(null)}
+                                        className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded"
+                                        aria-label="Close"
+                                    >
+                                        <X className="h-5 w-5" />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="px-4 py-4 overflow-y-auto flex-1">
+                                <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                                    <table className="min-w-full border border-neutral-300 text-sm">
+                                        <thead className="bg-neutral-50">
+                                            <tr>
+                                                <th className="border border-neutral-300 px-2 py-1 text-left w-12">No</th>
+                                                <th className="border border-neutral-300 px-2 py-1 text-left w-56">
+                                                    Category
+                                                </th>
+                                                <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                    Activity
+                                                </th>
+                                                <th className="border border-neutral-300 px-2 py-1 text-center w-24">
+                                                    No- achieved
+                                                </th>
+                                                <th className="border border-neutral-300 px-2 py-1 text-left w-64">
+                                                    Remark
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {MCH_CATEGORIES.map((category) => {
+                                                const rowSpan = category.activities.length;
+                                                return category.activities.map((act, index) => {
+                                                    const value =
+                                                        (viewReport.metrics || {})[act.key] === 0
+                                                            ? 0
+                                                            : (viewReport.metrics || {})[act.key] || '';
+                                                    const remark = (viewReport.metrics || {})[`${act.key}_remark`] || '';
+                                                    return (
+                                                        <tr key={`${category.no}-${act.key}`}>
+                                                            {index === 0 && (
+                                                                <>
+                                                                    <td
+                                                                        rowSpan={rowSpan}
+                                                                        className="border border-neutral-300 px-2 py-1 align-top"
+                                                                    >
+                                                                        {category.no}
+                                                                    </td>
+                                                                    <td
+                                                                        rowSpan={rowSpan}
+                                                                        className="border border-neutral-300 px-2 py-1 align-top font-medium"
+                                                                    >
+                                                                        {category.name}
+                                                                    </td>
+                                                                </>
+                                                            )}
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {act.label}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1 text-center">
+                                                                {value !== '' ? value : ''}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {remark}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                });
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
