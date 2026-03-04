@@ -1,70 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { getClients, createClient, getMentorMothers } from '../../services/recordService';
-import { X } from 'lucide-react';
+import { getAllClients, createClient, updateClient, deleteClient, getMentorMothers } from '../../services/recordService';
+import { X, Eye, Pencil, Trash2 } from 'lucide-react';
 
 const OTHER_MENTOR = '__other__';
+
+const getInitialFormData = () => ({
+    mentor_mother_name: '',
+    date: new Date().toISOString().split('T')[0],
+    total_green_cases: '',
+    total_blue_cases: '',
+    name: '',
+    age: '',
+    sex: 'F',
+    folder_number: '',
+    address: '',
+    weight: '',
+    muac: '',
+    identified_problem: '',
+    counseling_given: '',
+    demonstration_shown: '',
+    anything_additional: '',
+    problem_faced_by_mm: '',
+    spss_start_date: '', spss_first_name: '', spss_last_name: '', spss_marital_status_code: '', spss_job: '', spss_payment: '',
+    spss_number_child_deaths: '', spss_number_children_sd: '', spss_medical_record: '', spss_pregnant_record: '', spss_lactate: '',
+    spss_nutrition_status: '', spss_starting_month: '', spss_first_pv_date: '', spss_number_miscarriages: '', spss_immunization_count: '',
+    spss_delivery_status: '', spss_delivery_date: '', spss_child_death_after: '', spss_breastfeeding_status: '', spss_rh_factor: '',
+    spss_no_antenatal: '', spss_no_postnatal: '', spss_child_no_after: '', spss_second_preg_date: '', spss_second_pregnancy: '',
+    spss_second_breastfeeding: '', spss_second_antenatal: '', spss_second_postnatal: '', spss_second_immunization: '',
+    spss_second_delivery_date: '', spss_number_children_after: '',
+});
 
 const ClientRegistrations = ({ openModalRef }) => {
     const [clients, setClients] = useState([]);
     const [mentorMotherNames, setMentorMotherNames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [formData, setFormData] = useState({
-        mentor_mother_name: '',
-        date: new Date().toISOString().split('T')[0],
-        total_green_cases: '',
-        total_blue_cases: '',
-        name: '',
-        age: '',
-        sex: 'F',
-        folder_number: '',
-        address: '',
-        weight: '',
-        muac: '',
-        identified_problem: '',
-        counseling_given: '',
-        demonstration_shown: '',
-        anything_additional: '',
-        problem_faced_by_mm: '',
-        // SPSS-aligned extra fields
-        spss_start_date: '',
-        spss_first_name: '',
-        spss_last_name: '',
-        spss_marital_status_code: '',
-        spss_job: '',
-        spss_payment: '',
-        spss_number_child_deaths: '',
-        spss_number_children_sd: '',
-        spss_medical_record: '',
-        spss_pregnant_record: '',
-        spss_lactate: '',
-        spss_nutrition_status: '',
-        spss_starting_month: '',
-        spss_first_pv_date: '',
-        spss_number_miscarriages: '',
-        spss_immunization_count: '',
-        spss_delivery_status: '',
-        spss_delivery_date: '',
-        spss_child_death_after: '',
-        spss_breastfeeding_status: '',
-        spss_rh_factor: '',
-        spss_no_antenatal: '',
-        spss_no_postnatal: '',
-        spss_child_no_after: '',
-        spss_second_preg_date: '',
-        spss_second_pregnancy: '',
-        spss_second_breastfeeding: '',
-        spss_second_antenatal: '',
-        spss_second_postnatal: '',
-        spss_second_immunization: '',
-        spss_second_delivery_date: '',
-        spss_number_children_after: ''
-    });
+    const [viewClient, setViewClient] = useState(null);
+    const [editingClient, setEditingClient] = useState(null);
+    const [formData, setFormData] = useState(getInitialFormData);
 
     const fetchClients = async () => {
         try {
-            const res = await getClients();
-            setClients(res.data.results || res.data);
+            const res = await getAllClients();
+            setClients(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error(err);
         } finally {
@@ -90,9 +68,67 @@ const ClientRegistrations = ({ openModalRef }) => {
     }, [showModal]);
 
     useEffect(() => {
-        if (openModalRef) openModalRef.current = () => setShowModal(true);
+        if (openModalRef) openModalRef.current = () => { setEditingClient(null); setFormData(getInitialFormData()); setShowModal(true); };
         return () => { if (openModalRef) openModalRef.current = null; };
     }, [openModalRef]);
+
+    const openEdit = (client) => {
+        setViewClient(null);
+        setEditingClient(client);
+        setFormData(clientToFormData(client));
+        setShowModal(true);
+    };
+
+    const clientToFormData = (c) => ({
+        mentor_mother_name: c.mentor_mother_name ?? '',
+        date: c.date ?? new Date().toISOString().split('T')[0],
+        total_green_cases: c.total_green_cases ?? '',
+        total_blue_cases: c.total_blue_cases ?? '',
+        name: c.name ?? '',
+        age: c.age ?? '',
+        sex: c.sex ?? 'F',
+        folder_number: c.folder_number ?? '',
+        address: c.address ?? '',
+        weight: c.weight ?? '',
+        muac: c.muac ?? '',
+        identified_problem: c.identified_problem ?? '',
+        counseling_given: c.counseling_given ?? '',
+        demonstration_shown: c.demonstration_shown ?? '',
+        anything_additional: c.anything_additional ?? '',
+        problem_faced_by_mm: c.problem_faced_by_mm ?? '',
+        spss_start_date: c.spss_start_date ?? '',
+        spss_first_name: c.spss_first_name ?? '',
+        spss_last_name: c.spss_last_name ?? '',
+        spss_marital_status_code: c.spss_marital_status_code ?? '',
+        spss_job: c.spss_job ?? '',
+        spss_payment: c.spss_payment ?? '',
+        spss_number_child_deaths: c.spss_number_child_deaths ?? '',
+        spss_number_children_sd: c.spss_number_children_sd ?? '',
+        spss_medical_record: c.spss_medical_record ?? '',
+        spss_pregnant_record: c.spss_pregnant_record ?? '',
+        spss_lactate: c.spss_lactate ?? '',
+        spss_nutrition_status: c.spss_nutrition_status ?? '',
+        spss_starting_month: c.spss_starting_month ?? '',
+        spss_first_pv_date: c.spss_first_pv_date ?? '',
+        spss_number_miscarriages: c.spss_number_miscarriages ?? '',
+        spss_immunization_count: c.spss_immunization_count ?? '',
+        spss_delivery_status: c.spss_delivery_status ?? '',
+        spss_delivery_date: c.spss_delivery_date ?? '',
+        spss_child_death_after: c.spss_child_death_after ?? '',
+        spss_breastfeeding_status: c.spss_breastfeeding_status ?? '',
+        spss_rh_factor: c.spss_rh_factor ?? '',
+        spss_no_antenatal: c.spss_no_antenatal ?? '',
+        spss_no_postnatal: c.spss_no_postnatal ?? '',
+        spss_child_no_after: c.spss_child_no_after ?? '',
+        spss_second_preg_date: c.spss_second_preg_date ?? '',
+        spss_second_pregnancy: c.spss_second_pregnancy ?? '',
+        spss_second_breastfeeding: c.spss_second_breastfeeding ?? '',
+        spss_second_antenatal: c.spss_second_antenatal ?? '',
+        spss_second_postnatal: c.spss_second_postnatal ?? '',
+        spss_second_immunization: c.spss_second_immunization ?? '',
+        spss_second_delivery_date: c.spss_second_delivery_date ?? '',
+        spss_number_children_after: c.spss_number_children_after ?? '',
+    });
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -163,13 +199,37 @@ const ClientRegistrations = ({ openModalRef }) => {
                 payload[field] = value || null;
             });
 
-            await createClient(payload);
+            if (editingClient) {
+                await updateClient(editingClient.id, payload);
+                setEditingClient(null);
+            } else {
+                await createClient(payload);
+            }
             setShowModal(false);
             fetchClients();
         } catch (err) {
             console.error('Error creating client', err);
             alert('Failed to save record.');
         }
+    };
+
+    const handleDelete = async (client) => {
+        if (!window.confirm(`Delete registration for "${client.name}" (${client.date})?`)) return;
+        try {
+            await deleteClient(client.id);
+            setViewClient(null);
+            setEditingClient(null);
+            fetchClients();
+        } catch (err) {
+            console.error('Error deleting client', err);
+            alert('Failed to delete record.');
+        }
+    };
+
+    const closeModal = () => {
+        setShowModal(false);
+        setViewClient(null);
+        setEditingClient(null);
     };
 
     return (
@@ -186,48 +246,30 @@ const ClientRegistrations = ({ openModalRef }) => {
                                 <tr>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Total Green</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Total Blue</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">S.n</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Name</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Age</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Sex</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Folder</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Address</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Weight (kg)</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">MUAC (cm)</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Identified problem</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Counseling given</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Demonstration shown by MM</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Anything additional</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Problem faced by MMs</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client Name</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {clients.map((client, index) => (
-                                    <tr key={client.id} className="hover:bg-neutral-50 align-top">
+                                {clients.map((client) => (
+                                    <tr key={client.id} className="hover:bg-neutral-50">
                                         <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{client.mentor_mother_name}</td>
                                         <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{client.date}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.total_green_cases ?? '-'}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.total_blue_cases ?? '-'}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{index + 1}</td>
                                         <td className="px-3 py-3 text-sm font-medium text-primary-600 sm:px-4 sm:py-3 whitespace-nowrap">{client.name}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.age}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.sex}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.folder_number || '-'}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.address}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.weight ?? '-'}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.muac ?? '-'}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.identified_problem}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.counseling_given}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.demonstration_shown || ''}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.anything_additional || ''}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3">{client.problem_faced_by_mm || ''}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">{client.created_by_email ?? '-'}</td>
+                                        <td className="px-3 py-3 text-sm sm:px-4 sm:py-3 whitespace-nowrap text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); setViewClient(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Edit"><Pencil className="h-4 w-4" /></button>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(client); }} className="p-1.5 text-neutral-500 hover:text-red-600 rounded" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                                 {clients.length === 0 && (
                                     <tr>
-                                        <td colSpan="17" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
+                                        <td colSpan="5" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
                                             No registrations found.
                                         </td>
                                     </tr>
@@ -238,11 +280,87 @@ const ClientRegistrations = ({ openModalRef }) => {
                 )}
             </div>
 
-            {/* Modal */}
+            {/* View detail modal – all form fields */}
+            {viewClient && (() => {
+                const allFields = [
+                    ['Mentor Mother Name', viewClient.mentor_mother_name],
+                    ['Date', viewClient.date],
+                    ['Total case: Green (Mother)', viewClient.total_green_cases],
+                    ['Total case: Blue (Children)', viewClient.total_blue_cases],
+                    ['Client Name', viewClient.name],
+                    ['Age', viewClient.age],
+                    ['Sex', viewClient.sex],
+                    ['Folder Number', viewClient.folder_number],
+                    ['Address', viewClient.address],
+                    ['Weight (kg)', viewClient.weight],
+                    ['MUAC (cm)', viewClient.muac],
+                    ['Identified problem', viewClient.identified_problem],
+                    ['Counseling given', viewClient.counseling_given],
+                    ['Demonstration shown by MM', viewClient.demonstration_shown],
+                    ['Anything additional', viewClient.anything_additional],
+                    ['Problem faced by MMs', viewClient.problem_faced_by_mm],
+                    ['Added by', viewClient.created_by_email],
+                    ['Started Date (SDate)', viewClient.spss_start_date],
+                    ['First Name (FName)', viewClient.spss_first_name],
+                    ['Last Name (LName)', viewClient.spss_last_name],
+                    ['Marital Status (MStatus)', viewClient.spss_marital_status_code],
+                    ['Client Job (Job)', viewClient.spss_job],
+                    ['Client Payment (Payment)', viewClient.spss_payment],
+                    ['Number of Child Deaths (NoCDeath)', viewClient.spss_number_child_deaths],
+                    ['Number of Children (NoChildSD)', viewClient.spss_number_children_sd],
+                    ['Medical Record (MRecord)', viewClient.spss_medical_record],
+                    ['Pregnant Record (PLactate)', viewClient.spss_pregnant_record],
+                    ['Lactate (Lactate)', viewClient.spss_lactate],
+                    ['Nutritional Status (Nutrisional)', viewClient.spss_nutrition_status],
+                    ['Starting Month (SPmonth)', viewClient.spss_starting_month],
+                    ['First Pregnant Visit Date (FristPVDate)', viewClient.spss_first_pv_date],
+                    ['Number of Miscarriage (NoMiscarri)', viewClient.spss_number_miscarriages],
+                    ['Immunization (Imunization)', viewClient.spss_immunization_count],
+                    ['Delivery Status (DeliveryS)', viewClient.spss_delivery_status],
+                    ['Delivery Date (DeliveryD)', viewClient.spss_delivery_date],
+                    ['Child Death After (CDeathAFN)', viewClient.spss_child_death_after],
+                    ['Breastfeeding (BreastF)', viewClient.spss_breastfeeding_status],
+                    ['RH Factor (RHFactor)', viewClient.spss_rh_factor],
+                    ['No. Antenatal (NoAntenat)', viewClient.spss_no_antenatal],
+                    ['No. Postnatal (NoPostnata)', viewClient.spss_no_postnatal],
+                    ['Child No. After (ChildNOAF)', viewClient.spss_child_no_after],
+                    ['Second Date Pregnant (SDatePreg)', viewClient.spss_second_preg_date],
+                    ['Second Pregnancy (SPregnanc)', viewClient.spss_second_pregnancy],
+                    ['Second Breastfeeding (SPBreastF)', viewClient.spss_second_breastfeeding],
+                    ['Second Antenatal (SAntenatal)', viewClient.spss_second_antenatal],
+                    ['Second Postnatal (SPostnatal)', viewClient.spss_second_postnatal],
+                    ['Second Immunization (SpImunizati)', viewClient.spss_second_immunization],
+                    ['Second Delivery Date (SPDeliveryD)', viewClient.spss_second_delivery_date],
+                    ['No. Children After (Nochildefte)', viewClient.spss_number_children_after],
+                ];
+                return (
+                    <div className="fixed z-20 inset-0 overflow-y-auto p-4 sm:p-0">
+                        <div className="flex min-h-full items-center justify-center">
+                            <div className="fixed inset-0 bg-neutral-500 opacity-75" onClick={() => setViewClient(null)} />
+                            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                                <div className="px-4 pt-5 pb-2 border-b border-neutral-200 flex justify-between items-center">
+                                    <h3 className="text-lg font-medium text-neutral-900">Client Registration – Full Detail</h3>
+                                    <button onClick={() => setViewClient(null)} className="p-1 text-neutral-400 hover:text-neutral-600 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
+                                </div>
+                                <div className="px-4 py-4 overflow-y-auto flex-1 space-y-3 text-sm">
+                                    {allFields.map(([label, val]) => (
+                                        <div key={label}>
+                                            <span className="font-medium text-neutral-700">{label}:</span>{' '}
+                                            <span className="text-neutral-900">{val != null && val !== '' ? String(val) : '-'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Add/Edit Modal */}
             {showModal && (
                 <div className="fixed z-10 inset-0 overflow-y-auto">
                     <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-                        <div className="fixed inset-0 transition-opacity" onClick={() => setShowModal(false)}>
+                        <div className="fixed inset-0 transition-opacity" onClick={closeModal}>
                             <div className="absolute inset-0 bg-neutral-500 opacity-75"></div>
                         </div>
 
@@ -251,8 +369,8 @@ const ClientRegistrations = ({ openModalRef }) => {
                                 <div className="sm:flex sm:items-start w-full">
                                     <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
                                         <h3 className="text-base sm:text-lg leading-6 font-medium text-neutral-900 flex justify-between items-start gap-2">
-                                            <span className="min-w-0">Add New Client Registration</span>
-                                            <button onClick={() => setShowModal(false)} className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
+                                            <span className="min-w-0">{editingClient ? 'Edit Client Registration' : 'Add New Client Registration'}</span>
+                                            <button onClick={closeModal} className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
                                         </h3>
 
                                         <form onSubmit={handleSubmit} className="mt-4 sm:mt-6 grid grid-cols-1 gap-y-4 sm:gap-y-6 gap-x-4 sm:grid-cols-2">
@@ -464,11 +582,11 @@ const ClientRegistrations = ({ openModalRef }) => {
                                             <input type="number" name="spss_number_children_after" value={formData.spss_number_children_after} onChange={handleChange} className="mt-1 block w-full border-neutral-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm py-2 px-3 border" />
                                         </div>
                                             <div className="sm:col-span-2 flex flex-col sm:flex-row justify-end mt-4 sm:space-x-3">
-                                                <button type="button" onClick={() => setShowModal(false)} className="w-full sm:w-auto mb-3 sm:mb-0 inline-flex justify-center rounded-md border border-neutral-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-neutral-700 hover:bg-neutral-50 sm:text-sm">
+                                                <button type="button" onClick={closeModal} className="w-full sm:w-auto mb-3 sm:mb-0 inline-flex justify-center rounded-md border border-neutral-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-neutral-700 hover:bg-neutral-50 sm:text-sm">
                                                     Cancel
                                                 </button>
                                                 <button type="submit" className="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 sm:text-sm">
-                                                    Save Record
+                                                    {editingClient ? 'Update Record' : 'Save Record'}
                                                 </button>
                                             </div>
                                         </form>

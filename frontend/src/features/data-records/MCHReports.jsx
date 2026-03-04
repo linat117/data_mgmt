@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getReports, createReport, getMentorMothers } from '../../services/recordService';
-import { X } from 'lucide-react';
+import { getAllReports, getAllClients, createReport, updateReport, deleteReport, getMentorMothers } from '../../services/recordService';
+import { X, Eye, Pencil, Trash2 } from 'lucide-react';
 import { MCH_CATEGORIES, getInitialMCHMetrics } from './mchFormStructure';
 
 const OTHER_MENTOR = '__other__';
@@ -9,8 +9,10 @@ const MCHReports = ({ openModalRef }) => {
     const [reports, setReports] = useState([]);
     const [mentorMotherNames, setMentorMotherNames] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [viewReport, setViewReport] = useState(null);
+    const [editingReport, setEditingReport] = useState(null);
     const [formData, setFormData] = useState({
         mentor_mother_name: '',
         date: new Date().toISOString().split('T')[0],
@@ -20,11 +22,43 @@ const MCHReports = ({ openModalRef }) => {
     });
 
     const fetchReports = async () => {
+        setFetchError('');
         try {
-            const res = await getReports();
-            setReports(res.data.results || res.data);
+            const res = await getAllReports();
+            const list = Array.isArray(res.data) ? res.data : [];
+            if (list.length > 0) {
+                setReports(list);
+                setLoading(false);
+                return;
+            }
+            setReports(list);
+            try {
+                const clientsRes = await getAllClients();
+                const clients = Array.isArray(clientsRes.data) ? clientsRes.data : [];
+                const byKey = {};
+                clients.forEach((c) => {
+                    const key = `${c.mentor_mother_name}|${c.date}`;
+                    if (!byKey[key]) {
+                        byKey[key] = {
+                            id: `reg-${key}`,
+                            mentor_mother_name: c.mentor_mother_name,
+                            date: c.date,
+                            total_green: c.total_green_cases ?? 0,
+                            total_blue: c.total_blue_cases ?? 0,
+                            metrics: {},
+                            fromRegistrations: true,
+                        };
+                    }
+                });
+                const fromReg = Object.values(byKey);
+                if (fromReg.length > 0) setReports(fromReg);
+            } catch (innerErr) {
+                console.error(innerErr);
+            }
         } catch (err) {
             console.error(err);
+            setFetchError(err?.response?.data?.detail || err?.message || 'Failed to load MCH reports.');
+            setReports([]);
         } finally {
             setLoading(false);
         }
@@ -98,15 +132,14 @@ const MCHReports = ({ openModalRef }) => {
                 total_blue: Number(formData.total_blue) || 0,
                 metrics: buildMetricsPayload(),
             };
-            await createReport(dataToSubmit);
+            if (editingReport) {
+                await updateReport(editingReport.id, dataToSubmit);
+                setEditingReport(null);
+            } else {
+                await createReport(dataToSubmit);
+            }
             setShowModal(false);
-            setFormData({
-                mentor_mother_name: '',
-                date: new Date().toISOString().split('T')[0],
-                total_green: '',
-                total_blue: '',
-                metrics: getInitialMCHMetrics(),
-            });
+            resetForm();
             fetchReports();
         } catch (err) {
             console.error('Error creating report', err);
@@ -122,6 +155,35 @@ const MCHReports = ({ openModalRef }) => {
             total_blue: '',
             metrics: getInitialMCHMetrics(),
         });
+        setEditingReport(null);
+    };
+
+    const openEditReport = (report) => {
+        if (report.fromRegistrations) return;
+        setViewReport(null);
+        setEditingReport(report);
+        setFormData({
+            mentor_mother_name: report.mentor_mother_name ?? '',
+            date: report.date ?? new Date().toISOString().split('T')[0],
+            total_green: report.total_green ?? '',
+            total_blue: report.total_blue ?? '',
+            metrics: report.metrics && typeof report.metrics === 'object' ? { ...getInitialMCHMetrics(), ...report.metrics } : getInitialMCHMetrics(),
+        });
+        setShowModal(true);
+    };
+
+    const handleDeleteReport = async (report) => {
+        if (report.fromRegistrations) return;
+        if (!window.confirm(`Delete MCH report for ${report.mentor_mother_name} (${report.date})?`)) return;
+        try {
+            await deleteReport(report.id);
+            setViewReport(null);
+            setEditingReport(null);
+            fetchReports();
+        } catch (err) {
+            console.error('Error deleting report', err);
+            alert('Failed to delete report.');
+        }
     };
 
     return (
@@ -129,6 +191,11 @@ const MCHReports = ({ openModalRef }) => {
             <h2 className="text-lg font-medium text-neutral-800 sm:text-xl mb-4">Maternal and Child Health Services Report</h2>
 
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                {fetchError && (
+                    <div className="p-4 bg-red-50 border-b border-red-100 text-sm text-red-700">
+                        {fetchError}
+                    </div>
+                )}
                 {loading ? (
                     <div className="p-4 text-center text-neutral-500">Loading...</div>
                 ) : (
@@ -136,28 +203,26 @@ const MCHReports = ({ openModalRef }) => {
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50">
                                 <tr>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother’s Name</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Green</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Blue</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Metrics</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Green / Blue</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
                                 {reports.map((report) => (
-                                <tr
-                                        key={report.id}
-                                        className="hover:bg-neutral-50 cursor-pointer"
-                                        onClick={() => setViewReport(report)}
-                                    >
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">{report.date}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">{report.mentor_mother_name}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{report.total_green ?? '-'}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{report.total_blue ?? '-'}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4">
-                                            {report.metrics && typeof report.metrics === 'object' ? (
-                                                <span className="text-neutral-600">{Object.keys(report.metrics).filter(k => !k.endsWith('_remark')).length} activities recorded</span>
-                                            ) : '-'}
+                                    <tr key={report.id} className="hover:bg-neutral-50">
+                                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">{report.mentor_mother_name}</td>
+                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">{report.date}</td>
+                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{report.total_green ?? '-'} / {report.total_blue ?? '-'}</td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4 whitespace-nowrap">{report.created_by_email ?? '-'}</td>
+                                        <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <button type="button" onClick={() => setViewReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
+                                                <button type="button" onClick={() => openEditReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Edit" disabled={!!report.fromRegistrations}><Pencil className="h-4 w-4" /></button>
+                                                <button type="button" onClick={() => handleDeleteReport(report)} className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" disabled={!!report.fromRegistrations}><Trash2 className="h-4 w-4" /></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -181,8 +246,8 @@ const MCHReports = ({ openModalRef }) => {
                         <div className="relative bg-white rounded-lg text-left overflow-hidden shadow-xl w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
                             <div className="px-4 pt-5 pb-2 border-b border-neutral-200 flex-shrink-0">
                                 <h3 className="text-base sm:text-lg leading-6 font-medium text-neutral-900 flex justify-between items-center gap-2">
-                                    <span className="min-w-0">Maternal and Child Health Services Report</span>
-                                    <button onClick={() => setShowModal(false)} className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
+                                    <span className="min-w-0">{editingReport ? 'Edit MCH Report' : 'Maternal and Child Health Services Report'}</span>
+                                    <button onClick={() => { setShowModal(false); setEditingReport(null); }} className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
                                 </h3>
                             </div>
                             <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
@@ -255,11 +320,11 @@ const MCHReports = ({ openModalRef }) => {
                                     </div>
                                 </div>
                                 <div className="px-4 py-4 border-t border-neutral-200 flex-shrink-0 flex flex-col sm:flex-row justify-end gap-2">
-                                    <button type="button" onClick={() => setShowModal(false)} className="inline-flex justify-center rounded-md border border-neutral-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50">
+                                    <button type="button" onClick={() => { setShowModal(false); setEditingReport(null); }} className="inline-flex justify-center rounded-md border border-neutral-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50">
                                         Cancel
                                     </button>
                                     <button type="submit" className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-sm font-medium text-white hover:bg-primary-700">
-                                        Save Report
+                                        {editingReport ? 'Update Report' : 'Save Report'}
                                     </button>
                                 </div>
                             </form>
@@ -301,6 +366,14 @@ const MCHReports = ({ openModalRef }) => {
                                                     {viewReport.total_blue ?? 0}
                                                 </span>
                                             </div>
+                                            {viewReport.created_by_email && (
+                                                <div className="flex flex-wrap gap-4 mt-1">
+                                                    <span>
+                                                        <span className="font-semibold">Added by:</span>{' '}
+                                                        {viewReport.created_by_email}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <button
@@ -313,6 +386,11 @@ const MCHReports = ({ openModalRef }) => {
                                 </div>
                             </div>
                             <div className="px-4 py-4 overflow-y-auto flex-1">
+                                {viewReport.fromRegistrations ? (
+                                    <p className="text-sm text-neutral-600">
+                                        This row is from <strong>client registrations</strong>. No MCH report form has been submitted for this Mentor Mother and date. Add an MCH report using the form to record category metrics.
+                                    </p>
+                                ) : (
                                 <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
                                     <table className="min-w-full border border-neutral-300 text-sm">
                                         <thead className="bg-neutral-50">
@@ -375,6 +453,7 @@ const MCHReports = ({ openModalRef }) => {
                                         </tbody>
                                     </table>
                                 </div>
+                                )}
                             </div>
                         </div>
                     </div>

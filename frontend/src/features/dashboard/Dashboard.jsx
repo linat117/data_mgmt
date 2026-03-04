@@ -1,8 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboardStats } from '../../services/dashboardService';
-import { getClients, getReports, getPlans } from '../../services/recordService';
+import { getAllClients, getAllReports, getAllPlans } from '../../services/recordService';
 import { useAuthStore } from '../../store/authStore';
 import { Users, FileText, Activity, ShieldCheck } from 'lucide-react';
+import {
+    ResponsiveContainer,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
+    CartesianGrid,
+    Legend,
+    PieChart,
+    Pie,
+    Cell,
+} from 'recharts';
+
+const CHART_COLORS = {
+    neutral: '#a3a3a3',
+    primary: '#0d9488',
+    secondary: '#0891b2',
+    purple: '#7c3aed',
+    green: '#22c55e',
+    blue: '#3b82f6',
+};
+
+const OverviewBarColors = [CHART_COLORS.neutral, CHART_COLORS.primary, CHART_COLORS.secondary, CHART_COLORS.purple];
 
 const Dashboard = () => {
     const [stats, setStats] = useState(null);
@@ -13,8 +37,9 @@ const Dashboard = () => {
     const [reportCharts, setReportCharts] = useState({
         clients: { green: 0, blue: 0 },
         mch: { green: 0, blue: 0 },
-        plansByDay: {},
+        plansByDay: [],
     });
+    const [countsFromCharts, setCountsFromCharts] = useState({ mchReports: null, clients: null, plans: null });
     const { user } = useAuthStore();
     const isAdmin = user?.role === 'ADMIN';
 
@@ -34,14 +59,14 @@ const Dashboard = () => {
         const fetchReportCharts = async () => {
             try {
                 const [clientsRes, reportsRes, plansRes] = await Promise.all([
-                    getClients(),
-                    getReports(),
-                    getPlans(),
+                    getAllClients(),
+                    getAllReports(),
+                    getAllPlans(),
                 ]);
 
-                const clients = clientsRes.data.results || clientsRes.data || [];
-                const reports = reportsRes.data.results || reportsRes.data || [];
-                const plans = plansRes.data.results || plansRes.data || [];
+                const clients = Array.isArray(clientsRes.data) ? clientsRes.data : [];
+                const reports = Array.isArray(reportsRes.data) ? reportsRes.data : [];
+                const plans = Array.isArray(plansRes.data) ? plansRes.data : [];
 
                 const clientTotals = clients.reduce(
                     (acc, c) => {
@@ -61,17 +86,23 @@ const Dashboard = () => {
                     { green: 0, blue: 0 }
                 );
 
-                const plansByDay = plans.reduce((acc, p) => {
+                const dayOrder = ['Wixata', 'Kibxata', 'Roobi', 'Kamisa', 'Jimaata'];
+                const plansByDayMap = plans.reduce((acc, p) => {
                     const day = p.day_of_week || 'Other';
                     acc[day] = (acc[day] || 0) + 1;
                     return acc;
                 }, {});
+                const plansByDay = dayOrder.map((day) => ({
+                    name: day,
+                    count: plansByDayMap[day] || 0,
+                }));
 
                 setReportCharts({
                     clients: clientTotals,
                     mch: mchTotals,
                     plansByDay,
                 });
+                setCountsFromCharts({ mchReports: reports.length, clients: clients.length, plans: plans.length });
             } catch (err) {
                 console.error('Failed to fetch report charts', err);
                 setChartsError('Some report charts could not be loaded.');
@@ -103,6 +134,23 @@ const Dashboard = () => {
         );
     }
 
+    const overviewData = [
+        { name: 'Users', value: stats?.total_users ?? 0, fill: CHART_COLORS.neutral },
+        { name: 'Clients', value: stats?.total_clients ?? countsFromCharts.clients ?? 0, fill: CHART_COLORS.primary },
+        { name: 'MCH Reports', value: stats?.total_mch_reports ?? countsFromCharts.mchReports ?? 0, fill: CHART_COLORS.secondary },
+        { name: 'Weekly Plans', value: stats?.total_weekly_plans ?? countsFromCharts.plans ?? 0, fill: CHART_COLORS.purple },
+    ];
+
+    const clientPieData = [
+        { name: 'Green (Mothers)', value: reportCharts.clients.green, fill: CHART_COLORS.green },
+        { name: 'Blue (Children)', value: reportCharts.clients.blue, fill: CHART_COLORS.blue },
+    ].filter((d) => d.value > 0);
+
+    const mchPieData = [
+        { name: 'Green (Mothers)', value: reportCharts.mch.green, fill: CHART_COLORS.green },
+        { name: 'Blue (Children)', value: reportCharts.mch.blue, fill: CHART_COLORS.blue },
+    ].filter((d) => d.value > 0);
+
     return (
         <div className="min-w-0">
             <h1 className="text-xl font-semibold text-neutral-900 mb-4 sm:text-2xl sm:mb-6">Admin Dashboard</h1>
@@ -113,7 +161,6 @@ const Dashboard = () => {
             ) : (
                 <>
                     <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
                         <div className="bg-white overflow-hidden shadow rounded-lg">
                             <div className="p-4 sm:p-5">
                                 <div className="flex items-center">
@@ -160,7 +207,9 @@ const Dashboard = () => {
                                         <dl>
                                             <dt className="text-sm font-medium text-neutral-500 truncate">MCH Reports</dt>
                                             <dd className="flex items-baseline">
-                                                <div className="text-2xl font-semibold text-neutral-900">{stats?.total_mch_reports || 0}</div>
+                                                <div className="text-2xl font-semibold text-neutral-900">
+                                                    {stats?.total_mch_reports ?? countsFromCharts.mchReports ?? 0}
+                                                </div>
                                             </dd>
                                         </dl>
                                     </div>
@@ -185,49 +234,35 @@ const Dashboard = () => {
                                 </div>
                             </div>
                         </div>
-
                     </div>
 
                     <div className="mt-8 space-y-6">
                         <div className="bg-white shadow rounded-lg p-4 sm:p-6">
                             <h2 className="text-base sm:text-lg font-medium text-neutral-900 mb-4">Overall Overview</h2>
-                            {(() => {
-                                const data = [
-                                    { label: 'Users', value: stats?.total_users || 0, color: 'bg-neutral-400' },
-                                    { label: 'Clients', value: stats?.total_clients || 0, color: 'bg-primary-400' },
-                                    { label: 'MCH Reports', value: stats?.total_mch_reports || 0, color: 'bg-secondary-400' },
-                                    { label: 'Weekly Plans', value: stats?.total_weekly_plans || 0, color: 'bg-purple-400' },
-                                ];
-
-                                const maxValue = Math.max(...data.map(item => item.value), 0);
-
-                                if (!maxValue) {
-                                    return (
-                                        <p className="text-sm text-neutral-500">
-                                            No data available yet to display a chart. Data will appear here once reports are created.
-                                        </p>
-                                    );
-                                }
-
-                                return (
-                                    <div className="flex items-end gap-4 sm:gap-6 h-40 sm:h-48">
-                                        {data.map(item => (
-                                            <div key={item.label} className="flex-1 flex flex-col items-center">
-                                                <div className="w-full bg-neutral-100 rounded-t-md overflow-hidden flex items-end">
-                                                    <div
-                                                        className={`${item.color} w-full transition-all duration-500`}
-                                                        style={{ height: `${(item.value / maxValue) * 100}%` }}
-                                                    />
-                                                </div>
-                                                <div className="mt-2 text-xs sm:text-sm font-medium text-neutral-700 text-center">
-                                                    {item.label}
-                                                </div>
-                                                <div className="text-xs text-neutral-500">{item.value}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                );
-                            })()}
+                            {Math.max(...overviewData.map((d) => d.value)) === 0 ? (
+                                <p className="text-sm text-neutral-500">
+                                    No data available yet to display a chart. Data will appear here once records are created.
+                                </p>
+                            ) : (
+                                <div className="h-64 sm:h-80 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={overviewData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                                            <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#737373" />
+                                            <YAxis tick={{ fontSize: 12 }} stroke="#737373" allowDecimals={false} />
+                                            <Tooltip
+                                                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e5e5' }}
+                                                formatter={(value) => [value, 'Count']}
+                                            />
+                                            <Bar dataKey="value" name="Count" radius={[4, 4, 0, 0]}>
+                                                {overviewData.map((entry, index) => (
+                                                    <Cell key={`cell-${entry.name}`} fill={OverviewBarColors[index]} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -237,40 +272,38 @@ const Dashboard = () => {
                                 </h3>
                                 {chartsLoading ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">Loading chart...</p>
-                                ) : (() => {
-                                    const { green, blue } = reportCharts.clients;
-                                    const total = green + blue;
-
-                                    if (!total) {
-                                        return (
-                                            <p className="text-xs sm:text-sm text-neutral-500">
-                                                No client registration data available yet.
-                                            </p>
-                                        );
-                                    }
-
-                                    const greenPct = (green / total) * 100;
-                                    const bluePct = (blue / total) * 100;
-
-                                    return (
-                                        <div className="space-y-3">
-                                            <div className="h-6 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                                                <div
-                                                    className="bg-green-500 h-full"
-                                                    style={{ width: `${greenPct}%` }}
+                                ) : clientPieData.length === 0 ? (
+                                    <p className="text-xs sm:text-sm text-neutral-500">
+                                        No client registration data available yet.
+                                    </p>
+                                ) : (
+                                    <div className="h-56 sm:h-64 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={clientPieData}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    outerRadius="70%"
+                                                    innerRadius="45%"
+                                                    paddingAngle={2}
+                                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                                >
+                                                    {clientPieData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e5e5' }}
+                                                    formatter={(value) => [value, 'Cases']}
                                                 />
-                                                <div
-                                                    className="bg-blue-500 h-full"
-                                                    style={{ width: `${bluePct}%` }}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between text-xs sm:text-sm text-neutral-700">
-                                                <span>Green (Mothers): {green}</span>
-                                                <span>Blue (Children): {blue}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
+                                                <Legend />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="bg-white shadow rounded-lg p-4 sm:p-5">
@@ -279,40 +312,38 @@ const Dashboard = () => {
                                 </h3>
                                 {chartsLoading ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">Loading chart...</p>
-                                ) : (() => {
-                                    const { green, blue } = reportCharts.mch;
-                                    const total = green + blue;
-
-                                    if (!total) {
-                                        return (
-                                            <p className="text-xs sm:text-sm text-neutral-500">
-                                                No MCH report data available yet.
-                                            </p>
-                                        );
-                                    }
-
-                                    const greenPct = (green / total) * 100;
-                                    const bluePct = (blue / total) * 100;
-
-                                    return (
-                                        <div className="space-y-3">
-                                            <div className="h-6 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                                                <div
-                                                    className="bg-green-500 h-full"
-                                                    style={{ width: `${greenPct}%` }}
+                                ) : mchPieData.length === 0 ? (
+                                    <p className="text-xs sm:text-sm text-neutral-500">
+                                        No MCH report data available yet.
+                                    </p>
+                                ) : (
+                                    <div className="h-56 sm:h-64 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={mchPieData}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    outerRadius="70%"
+                                                    innerRadius="45%"
+                                                    paddingAngle={2}
+                                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                                >
+                                                    {mchPieData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e5e5' }}
+                                                    formatter={(value) => [value, 'Cases']}
                                                 />
-                                                <div
-                                                    className="bg-blue-500 h-full"
-                                                    style={{ width: `${bluePct}%` }}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between text-xs sm:text-sm text-neutral-700">
-                                                <span>Green (Mothers): {green}</span>
-                                                <span>Blue (Children): {blue}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
+                                                <Legend />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="bg-white shadow rounded-lg p-4 sm:p-5">
@@ -321,42 +352,30 @@ const Dashboard = () => {
                                 </h3>
                                 {chartsLoading ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">Loading chart...</p>
-                                ) : (() => {
-                                    const dayOrder = ['Wixata', 'Kibxata', 'Roobi', 'Kamisa', 'Jimaata'];
-                                    const data = dayOrder.map(day => ({
-                                        label: day,
-                                        value: reportCharts.plansByDay[day] || 0,
-                                    }));
-
-                                    const maxValue = Math.max(...data.map(d => d.value), 0);
-
-                                    if (!maxValue) {
-                                        return (
-                                            <p className="text-xs sm:text-sm text-neutral-500">
-                                                No weekly plans data available yet.
-                                            </p>
-                                        );
-                                    }
-
-                                    return (
-                                        <div className="flex items-end gap-3 h-32">
-                                            {data.map(d => (
-                                                <div key={d.label} className="flex-1 flex flex-col items-center">
-                                                    <div className="w-full bg-neutral-100 rounded-t-md overflow-hidden flex items-end">
-                                                        <div
-                                                            className="bg-primary-500 w-full"
-                                                            style={{ height: `${(d.value / maxValue) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                    <div className="mt-1 text-[10px] sm:text-xs text-neutral-700 text-center">
-                                                        {d.label}
-                                                    </div>
-                                                    <div className="text-[10px] text-neutral-500">{d.value}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    );
-                                })()}
+                                ) : reportCharts.plansByDay.every((d) => d.count === 0) ? (
+                                    <p className="text-xs sm:text-sm text-neutral-500">
+                                        No weekly plans data available yet.
+                                    </p>
+                                ) : (
+                                    <div className="h-56 sm:h-64 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart
+                                                data={reportCharts.plansByDay}
+                                                layout="vertical"
+                                                margin={{ top: 4, right: 24, left: 48, bottom: 4 }}
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" horizontal={false} />
+                                                <XAxis type="number" tick={{ fontSize: 11 }} stroke="#737373" allowDecimals={false} />
+                                                <YAxis type="category" dataKey="name" width={44} tick={{ fontSize: 11 }} stroke="#737373" />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e5e5' }}
+                                                    formatter={(value) => [value, 'Plans']}
+                                                />
+                                                <Bar dataKey="count" name="Plans" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

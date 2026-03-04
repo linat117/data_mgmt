@@ -14,9 +14,8 @@ class BaseMCHViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdminPermission]
 
     def get_queryset(self):
-        if self.request.user.role == 'ADMIN':
-            return self.queryset.all()
-        return self.queryset.filter(created_by=self.request.user)
+        qs = self.queryset.all() if self.request.user.role == 'ADMIN' else self.queryset.filter(created_by=self.request.user)
+        return qs.select_related('created_by')
 
     def perform_create(self, serializer):
         instance = serializer.save(created_by=self.request.user)

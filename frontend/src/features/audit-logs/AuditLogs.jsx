@@ -21,10 +21,15 @@ const AuditLogs = () => {
         fetchLogs();
     }, []);
 
-    const filteredLogs = logs.filter(log =>
-        log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.table_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLogs = logs.filter(log => {
+        const term = searchTerm.toLowerCase();
+        return (
+            (log.action && log.action.toLowerCase().includes(term)) ||
+            (log.table_name && log.table_name.toLowerCase().includes(term)) ||
+            (log.user_display && log.user_display.toLowerCase().includes(term)) ||
+            (log.description && log.description.toLowerCase().includes(term))
+        );
+    });
 
     return (
         <div className="flex flex-col h-full min-w-0">
@@ -60,40 +65,29 @@ const AuditLogs = () => {
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50 sticky top-0">
                                 <tr>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Timestamp</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">User ID</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Action</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Table</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Record ID</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">IP Address</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">When</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Who</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">What happened</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
                                 {filteredLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-neutral-50 transition-colors">
                                         <td className="px-3 py-3 whitespace-nowrap text-xs sm:text-sm text-neutral-500 sm:px-6 sm:py-4">
-                                            {new Date(log.timestamp).toLocaleString()}
+                                            {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
                                         </td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-neutral-900 sm:px-6 sm:py-4 truncate max-w-[120px] sm:max-w-none">
-                                            {log.user || 'System/Unauth'}
+                                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-neutral-900 sm:px-6 sm:py-4 truncate max-w-[160px] sm:max-w-none">
+                                            {log.user_display || 'System'}
                                         </td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm sm:px-6 sm:py-4">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${log.action === 'CREATE' ? 'bg-green-100 text-green-800' :
-                                                    log.action === 'UPDATE' ? 'bg-blue-100 text-blue-800' :
-                                                        log.action === 'DELETE' ? 'bg-red-100 text-red-800' :
-                                                            'bg-neutral-100 text-neutral-800'
-                                                }`}>
-                                                {log.action}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">
-                                            <code className="bg-neutral-100 px-1 py-0.5 text-xs rounded text-pink-600">{log.table_name}</code>
-                                        </td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 font-mono text-xs sm:px-6 sm:py-4">
-                                            {log.record_id || '-'}
-                                        </td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">
-                                            {log.ip_address || '-'}
+                                        <td className="px-3 py-3 whitespace-normal text-sm text-neutral-700 sm:px-6 sm:py-4">
+                                            {log.description || (
+                                                <>
+                                                    <span className="font-semibold">{log.action}</span>{' '}
+                                                    on <span className="font-mono text-xs">{log.table_name}</span>
+                                                    {log.record_id && <> (record {log.record_id})</>}
+                                                    {log.ip_address && <> from {log.ip_address}</>}
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
