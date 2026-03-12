@@ -40,8 +40,8 @@ const Dashboard = () => {
         plansByDay: [],
     });
     const [countsFromCharts, setCountsFromCharts] = useState({ mchReports: null, clients: null, plans: null });
-    const { user } = useAuthStore();
-    const isAdmin = user?.role === 'ADMIN';
+    const { user, hasPermission } = useAuthStore();
+    const canSeeDashboard = user?.role === 'SUPER_ADMIN' || user?.role === 'PM' || hasPermission('dashboard.view');
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -111,23 +111,23 @@ const Dashboard = () => {
             }
         };
 
-        if (isAdmin) {
+        if (canSeeDashboard) {
             fetchStats();
             fetchReportCharts();
         } else {
             setLoading(false);
             setChartsLoading(false);
         }
-    }, [isAdmin]);
+    }, [canSeeDashboard]);
 
-    if (!isAdmin) {
+    if (!canSeeDashboard) {
         return (
             <div className="bg-white shadow sm:rounded-lg">
                 <div className="px-4 py-5 sm:p-6 text-center">
                     <ShieldCheck className="mx-auto h-12 w-12 text-green-500 mb-4" />
-                    <h3 className="text-lg leading-6 font-medium text-neutral-900">Welcome, {user?.email}</h3>
+                    <h3 className="text-lg leading-6 font-medium text-neutral-900">Welcome, {user?.first_name || user?.email}</h3>
                     <div className="mt-2 text-sm text-neutral-500">
-                        <p>You are logged in as a Data Entry Expert. Navigate to Data Records to manage your tasks.</p>
+                        <p>You are logged in as a Mentor Mother. Navigate to Data Records to enter and view your data.</p>
                     </div>
                 </div>
             </div>
@@ -153,7 +153,7 @@ const Dashboard = () => {
 
     return (
         <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-neutral-900 mb-4 sm:text-2xl sm:mb-6">Admin Dashboard</h1>
+            <h1 className="text-xl font-semibold text-neutral-900 mb-4 sm:text-2xl sm:mb-6">Dashboard</h1>
             {error && <div className="mb-4 text-red-600 text-sm sm:text-base">{error}</div>}
 
             {loading ? (

@@ -85,7 +85,6 @@ const AuditLogs = () => {
                                                     <span className="font-semibold">{log.action}</span>{' '}
                                                     on <span className="font-mono text-xs">{log.table_name}</span>
                                                     {log.record_id && <> (record {log.record_id})</>}
-                                                    {log.ip_address && <> from {log.ip_address}</>}
                                                 </>
                                             )}
                                         </td>

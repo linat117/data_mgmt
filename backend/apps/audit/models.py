@@ -19,5 +19,10 @@ class AuditLog(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        usr = self.user.email if self.user else "System"
-        return f"{usr} - {self.action} - {self.table_name} at {self.timestamp}"
+        if self.user:
+            first = (getattr(self.user, "first_name", "") or "").strip()
+            last = (getattr(self.user, "last_name", "") or "").strip()
+            full = " ".join(p for p in [first, last] if p) or self.user.email
+        else:
+            full = "System"
+        return f"{full} - {self.action} - {self.table_name} at {self.timestamp}"

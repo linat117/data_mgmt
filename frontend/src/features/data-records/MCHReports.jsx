@@ -7,6 +7,7 @@ const OTHER_MENTOR = '__other__';
 
 const MCHReports = ({ openModalRef }) => {
     const [reports, setReports] = useState([]);
+    const [clients, setClients] = useState([]);
     const [mentorMotherNames, setMentorMotherNames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState('');
@@ -20,6 +21,7 @@ const MCHReports = ({ openModalRef }) => {
         total_blue: '',
         metrics: getInitialMCHMetrics(),
     });
+    const [regionFilter, setRegionFilter] = useState('');
 
     const fetchReports = async () => {
         setFetchError('');
@@ -64,6 +66,15 @@ const MCHReports = ({ openModalRef }) => {
         }
     };
 
+    const fetchClients = async () => {
+        try {
+            const res = await getAllClients();
+            setClients(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const fetchMentorMothers = async () => {
         try {
             const res = await getMentorMothers();
@@ -75,6 +86,7 @@ const MCHReports = ({ openModalRef }) => {
 
     useEffect(() => {
         fetchReports();
+        fetchClients();
     }, []);
 
     useEffect(() => {
@@ -186,6 +198,18 @@ const MCHReports = ({ openModalRef }) => {
         }
     };
 
+    const regionOptions = Array.from(
+        new Set(
+            reports
+                .map((r) => r.created_by_region_code)
+                .filter((code) => code && typeof code === 'string')
+        )
+    );
+
+    const filteredReports = regionFilter
+        ? reports.filter((r) => r.created_by_region_code === regionFilter)
+        : reports;
+
     return (
         <div className="min-w-0">
             <h2 className="text-lg font-medium text-neutral-800 sm:text-xl mb-4">Maternal and Child Health Services Report</h2>
@@ -200,32 +224,79 @@ const MCHReports = ({ openModalRef }) => {
                     <div className="p-4 text-center text-neutral-500">Loading...</div>
                 ) : (
                     <div className="overflow-x-auto -mx-3 sm:mx-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+                        {regionOptions.length > 0 && (
+                            <div className="px-3 pt-3 pb-2 sm:px-6 flex items-center gap-2 text-sm">
+                                <span className="text-neutral-600 font-medium">Region:</span>
+                                <select
+                                    value={regionFilter}
+                                    onChange={(e) => setRegionFilter(e.target.value)}
+                                    className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white"
+                                >
+                                    <option value="">All</option>
+                                    {regionOptions.map((code) => (
+                                        <option key={code} value={code}>
+                                            {code}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50">
                                 <tr>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client Name</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Age</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Sex</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Folder</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother’s Name</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Green / Blue</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {reports.map((report) => (
-                                    <tr key={report.id} className="hover:bg-neutral-50">
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">{report.mentor_mother_name}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">{report.date}</td>
-                                        <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-500 sm:px-6 sm:py-4">{report.total_green ?? '-'} / {report.total_blue ?? '-'}</td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4 whitespace-nowrap">{report.created_by_email ?? '-'}</td>
-                                        <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button type="button" onClick={() => setViewReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
-                                                <button type="button" onClick={() => openEditReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Edit" disabled={!!report.fromRegistrations}><Pencil className="h-4 w-4" /></button>
-                                                <button type="button" onClick={() => handleDeleteReport(report)} className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" disabled={!!report.fromRegistrations}><Trash2 className="h-4 w-4" /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {filteredReports.map((report) => {
+                                    const relatedClients = clients.filter(
+                                        (c) =>
+                                            c.mentor_mother_name === report.mentor_mother_name &&
+                                            c.date === report.date
+                                    );
+                                    const firstClient = relatedClients[0] || {};
+                                    const addedBy =
+                                        report.created_by_name ||
+                                        report.created_by_email ||
+                                        firstClient.created_by_name ||
+                                        firstClient.created_by_email ||
+                                        '—';
+                                    return (
+                                        <tr key={report.id} className="hover:bg-neutral-50">
+                                            <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">
+                                                {firstClient.name || '—'}
+                                            </td>
+                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
+                                                {firstClient.age ?? '—'}
+                                            </td>
+                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
+                                                {firstClient.sex || '—'}
+                                            </td>
+                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
+                                                {firstClient.folder_number || '—'}
+                                            </td>
+                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
+                                                {report.mentor_mother_name}
+                                            </td>
+                                            <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                {addedBy}
+                                            </td>
+                                            <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button type="button" onClick={() => setViewReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
+                                                    <button type="button" onClick={() => openEditReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Edit" disabled={!!report.fromRegistrations}><Pencil className="h-4 w-4" /></button>
+                                                    <button type="button" onClick={() => handleDeleteReport(report)} className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" disabled={!!report.fromRegistrations}><Trash2 className="h-4 w-4" /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 {reports.length === 0 && (
                                     <tr>
                                         <td colSpan="5" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-6">No reports found.</td>
@@ -385,75 +456,180 @@ const MCHReports = ({ openModalRef }) => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="px-4 py-4 overflow-y-auto flex-1">
-                                {viewReport.fromRegistrations ? (
-                                    <p className="text-sm text-neutral-600">
-                                        This row is from <strong>client registrations</strong>. No MCH report form has been submitted for this Mentor Mother and date. Add an MCH report using the form to record category metrics.
-                                    </p>
-                                ) : (
+                            <div className="px-4 py-4 overflow-y-auto flex-1 space-y-6">
+                                {!viewReport.fromRegistrations && (
+                                    <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                                        <table className="min-w-full border border-neutral-300 text-sm">
+                                            <thead className="bg-neutral-50">
+                                                <tr>
+                                                    <th className="border border-neutral-300 px-2 py-1 text-left w-12">No</th>
+                                                    <th className="border border-neutral-300 px-2 py-1 text-left w-56">
+                                                        Category
+                                                    </th>
+                                                    <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                        Activity
+                                                    </th>
+                                                    <th className="border border-neutral-300 px-2 py-1 text-center w-24">
+                                                        No- achieved
+                                                    </th>
+                                                    <th className="border border-neutral-300 px-2 py-1 text-left w-64">
+                                                        Remark
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {MCH_CATEGORIES.map((category) => {
+                                                    const rowSpan = category.activities.length;
+                                                    return category.activities.map((act, index) => {
+                                                        const value =
+                                                            (viewReport.metrics || {})[act.key] === 0
+                                                                ? 0
+                                                                : (viewReport.metrics || {})[act.key] || '';
+                                                        const remark = (viewReport.metrics || {})[`${act.key}_remark`] || '';
+                                                        return (
+                                                            <tr key={`${category.no}-${act.key}`}>
+                                                                {index === 0 && (
+                                                                    <>
+                                                                        <td
+                                                                            rowSpan={rowSpan}
+                                                                            className="border border-neutral-300 px-2 py-1 align-top"
+                                                                        >
+                                                                            {category.no}
+                                                                        </td>
+                                                                        <td
+                                                                            rowSpan={rowSpan}
+                                                                            className="border border-neutral-300 px-2 py-1 align-top font-medium"
+                                                                        >
+                                                                            {category.name}
+                                                                        </td>
+                                                                    </>
+                                                                )}
+                                                                <td className="border border-neutral-300 px-2 py-1">
+                                                                    {act.label}
+                                                                </td>
+                                                                <td className="border border-neutral-300 px-2 py-1 text-center">
+                                                                    {value !== '' ? value : ''}
+                                                                </td>
+                                                                <td className="border border-neutral-300 px-2 py-1">
+                                                                    {remark}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    });
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
                                 <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-                                    <table className="min-w-full border border-neutral-300 text-sm">
-                                        <thead className="bg-neutral-50">
-                                            <tr>
-                                                <th className="border border-neutral-300 px-2 py-1 text-left w-12">No</th>
-                                                <th className="border border-neutral-300 px-2 py-1 text-left w-56">
-                                                    Category
-                                                </th>
-                                                <th className="border border-neutral-300 px-2 py-1 text-left">
-                                                    Activity
-                                                </th>
-                                                <th className="border border-neutral-300 px-2 py-1 text-center w-24">
-                                                    No- achieved
-                                                </th>
-                                                <th className="border border-neutral-300 px-2 py-1 text-left w-64">
-                                                    Remark
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {MCH_CATEGORIES.map((category) => {
-                                                const rowSpan = category.activities.length;
-                                                return category.activities.map((act, index) => {
-                                                    const value =
-                                                        (viewReport.metrics || {})[act.key] === 0
-                                                            ? 0
-                                                            : (viewReport.metrics || {})[act.key] || '';
-                                                    const remark = (viewReport.metrics || {})[`${act.key}_remark`] || '';
-                                                    return (
-                                                        <tr key={`${category.no}-${act.key}`}>
-                                                            {index === 0 && (
-                                                                <>
-                                                                    <td
-                                                                        rowSpan={rowSpan}
-                                                                        className="border border-neutral-300 px-2 py-1 align-top"
-                                                                    >
-                                                                        {category.no}
-                                                                    </td>
-                                                                    <td
-                                                                        rowSpan={rowSpan}
-                                                                        className="border border-neutral-300 px-2 py-1 align-top font-medium"
-                                                                    >
-                                                                        {category.name}
-                                                                    </td>
-                                                                </>
-                                                            )}
+                                    {(() => {
+                                        const relatedClients = clients.filter(
+                                            (c) =>
+                                                c.mentor_mother_name === viewReport.mentor_mother_name &&
+                                                c.date === viewReport.date
+                                        );
+                                        if (relatedClients.length === 0) {
+                                            return (
+                                                <p className="text-sm text-neutral-600">
+                                                    No client registrations found for this Mentor Mother and date.
+                                                </p>
+                                            );
+                                        }
+                                        return (
+                                            <table className="min-w-full border border-neutral-300 text-sm">
+                                                <thead className="bg-neutral-50">
+                                                    <tr>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-center w-12">
+                                                            S.n
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Name
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-center">
+                                                            Age
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-center">
+                                                            Sex
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Folder
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Address
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-center">
+                                                            Weight
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-center">
+                                                            MUAC
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Identified problem
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Counseling given
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Demonstration shown by MM
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Anything additional
+                                                        </th>
+                                                        <th className="border border-neutral-300 px-2 py-1 text-left">
+                                                            Problem faced by MMs
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {relatedClients.map((client, index) => (
+                                                        <tr key={client.id || index}>
+                                                            <td className="border border-neutral-300 px-2 py-1 text-center">
+                                                                {index + 1}
+                                                            </td>
                                                             <td className="border border-neutral-300 px-2 py-1">
-                                                                {act.label}
+                                                                {client.name}
                                                             </td>
                                                             <td className="border border-neutral-300 px-2 py-1 text-center">
-                                                                {value !== '' ? value : ''}
+                                                                {client.age}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1 text-center">
+                                                                {client.sex}
                                                             </td>
                                                             <td className="border border-neutral-300 px-2 py-1">
-                                                                {remark}
+                                                                {client.folder_number}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {client.address}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1 text-center">
+                                                                {client.weight}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1 text-center">
+                                                                {client.muac}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {client.identified_problem}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {client.counseling_given}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {client.demonstration_shown}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {client.anything_additional}
+                                                            </td>
+                                                            <td className="border border-neutral-300 px-2 py-1">
+                                                                {client.problem_faced_by_mm}
                                                             </td>
                                                         </tr>
-                                                    );
-                                                });
-                                            })}
-                                        </tbody>
-                                    </table>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        );
+                                    })()}
                                 </div>
-                                )}
                             </div>
                         </div>
                     </div>

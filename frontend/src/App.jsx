@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Dashboard from './features/dashboard/Dashboard';
 import Records from './features/data-records/Records';
 import Users from './features/auth/Users';
+import UserDetail from './features/auth/UserDetail';
 import AuditLogs from './features/audit-logs/AuditLogs';
 
 function App() {
@@ -23,9 +24,13 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/records/*" element={<Records />} />
 
-            {/* Admin only routes */}
-            <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+            {/* Users: Super Admin and PM */}
+            <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'PM']} />}>
               <Route path="/users" element={<Users />} />
+              <Route path="/users/:userId" element={<UserDetail />} />
+            </Route>
+            {/* Audit logs: Super Admin only */}
+            <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
               <Route path="/audit-logs" element={<AuditLogs />} />
             </Route>
           </Route>

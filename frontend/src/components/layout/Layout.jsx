@@ -23,7 +23,7 @@ const SidebarLink = ({ to, icon, label, currentPath, onClick }) => {
 };
 
 const Layout = () => {
-    const { user, logout } = useAuthStore();
+    const { user, logout, roleLabel } = useAuthStore();
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,7 +45,8 @@ const Layout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const isAdmin = user?.role === 'ADMIN';
+    const canManageUsers = user?.role === 'SUPER_ADMIN' || user?.role === 'PM';
+    const canViewAudit = user?.role === 'SUPER_ADMIN';
 
     const sidebarContent = (
         <div className="flex flex-col h-0 flex-1 bg-neutral-900">
@@ -56,11 +57,11 @@ const Layout = () => {
                 <nav className="mt-8 flex-1 px-2 space-y-2">
                     <SidebarLink to="/dashboard" icon={<LayoutDashboard />} label="Dashboard" currentPath={location.pathname} onClick={closeSidebar} />
                     <SidebarLink to="/records" icon={<FileText />} label="Data Records" currentPath={location.pathname} onClick={closeSidebar} />
-                    {isAdmin && (
-                        <>
-                            <SidebarLink to="/users" icon={<Users />} label="Users" currentPath={location.pathname} onClick={closeSidebar} />
-                            <SidebarLink to="/audit-logs" icon={<Activity />} label="Audit Logs" currentPath={location.pathname} onClick={closeSidebar} />
-                        </>
+                    {canManageUsers && (
+                        <SidebarLink to="/users" icon={<Users />} label="Users" currentPath={location.pathname} onClick={closeSidebar} />
+                    )}
+                    {canViewAudit && (
+                        <SidebarLink to="/audit-logs" icon={<Activity />} label="Audit Logs" currentPath={location.pathname} onClick={closeSidebar} />
                     )}
                 </nav>
             </div>
@@ -70,7 +71,7 @@ const Layout = () => {
                         <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium text-white truncate">{user?.email}</p>
                             <p className="text-xs font-medium text-neutral-300 group-hover:text-white mt-1">
-                                {user?.role === 'ADMIN' ? 'Administrator' : 'Data Expert'}
+                                {roleLabel()}
                             </p>
                         </div>
                         <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-white transition-colors flex-shrink-0" title="Logout">

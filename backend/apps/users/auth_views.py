@@ -7,6 +7,7 @@ from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
@@ -81,3 +82,31 @@ class CustomLoginView(APIView):
                 {'detail': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class MeView(APIView):
+    """Return current user profile: id, email, role, names, region, pm, permission_codes."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user or not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        user = request.user
+        permission_codes = list(user.feature_permissions.values_list('code', flat=True))
+        data = {
+            'user_id': str(user.id),
+            'email': user.email,
+            'first_name': user.first_name or '',
+            'last_name': user.last_name or '',
+            'role': getattr(user, 'role', None),
+            'phone_number': getattr(user, 'phone_number', '') or '',
+            'region': None,
+            'pm': None,
+            'permission_codes': permission_codes,
+        }
+        if user.region_id:
+            data['region'] = {'id': str(user.region.id), 'name': user.region.name, 'code': user.region.code}
+        if user.pm_id:
+            data['pm'] = {'id': str(user.pm.id), 'email': user.pm.email}
+        return Response(data, status=status.HTTP_200_OK)

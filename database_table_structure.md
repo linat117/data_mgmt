@@ -1,5 +1,30 @@
 ## Database Table Structure
 
+### Table: Region
+
+- **id**: UUID, primary key.
+- **name**: string, unique, required.
+- **code**: string, unique, required.
+
+### Table: FeaturePermission
+
+- **id**: UUID, primary key.
+- **code**: string, unique, required (e.g. `dashboard.view`, `records.edit`).
+- **name**: string, required.
+- **description**: text, optional.
+
+### Table: User (extends Django AbstractUser)
+
+- **id**: UUID, primary key.
+- **email**: email, unique, required (USERNAME_FIELD).
+- **first_name**, **last_name**: string, optional.
+- **role**: one of `SUPER_ADMIN`, `PM`, `MENTOR_MOTHER`.
+- **phone_number**: string, optional.
+- **region_id**: FK to Region, nullable (used for PM; for MM derived from PM).
+- **pm_id**: FK to User (self), nullable (Mentor Mother’s assigned PM).
+- **feature_permissions**: M2M to FeaturePermission (granular permissions).
+- **is_active**, **date_joined**, etc. (Django standard).
+
 ### Table: ClientRegistration
 
 - **id**: UUID, primary key.
@@ -55,4 +80,27 @@
 - **spss_second_immunization**: integer, optional (SPSS `SpImunizati`).
 - **spss_second_delivery_date**: date, optional (SPSS `SPDeliveryD`).
 - **spss_number_children_after**: integer, optional (SPSS `Nochildefte`).
+
+#### Third pregnancy (modeled like second)
+
+- **spss_third_preg_date**: date, optional (third pregnancy date).
+- **spss_third_pregnancy**: integer, optional (third pregnancy delivery status; same codes as `spss_second_pregnancy` / `DELIVERY_STORY`).
+- **spss_third_breastfeeding**: integer, optional (third pregnancy breastfeeding status; same codes as `BREAST_FEEDING`).
+- **spss_third_antenatal**: integer, optional (third pregnancy antenatal care count).
+- **spss_third_postnatal**: integer, optional (third pregnancy postnatal care count).
+- **spss_third_immunization**: integer, optional (third pregnancy immunization; same codes as `IMMUNIZATION`).
+- **spss_third_delivery_date**: date, optional (third pregnancy delivery date).
+- **spss_third_number_children_after**: integer, optional (number of children after third pregnancy).
+
+#### Additional pregnancies (flexible JSON)
+
+- **pregnancies**: JSON array, optional. Each element represents one pregnancy after the first, with keys:
+  - `preg_date`: date, optional.
+  - `pregnancy`: integer, optional (delivery status; codes same as `DELIVERY_STORY`).
+  - `breastfeeding`: integer, optional (codes same as `BREAST_FEEDING`).
+  - `antenatal`: integer, optional (antenatal care count).
+  - `postnatal`: integer, optional (postnatal care count).
+  - `immunization`: integer, optional (codes same as `IMMUNIZATION`).
+  - `delivery_date`: date, optional.
+  - `number_children_after`: integer, optional (children count after this pregnancy).
 

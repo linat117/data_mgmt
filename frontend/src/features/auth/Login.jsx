@@ -22,23 +22,19 @@ const Login = () => {
             const response = await api.post('/auth/login/', { email, password });
             setTokens(response.data.access, response.data.refresh);
 
-            // Normally, you might decode the JWT or fetch the user profile here.
-            // Since our simple backend doesn't decode, let's just make a fast API call or decode JWT (if added)
-            // For now we'll fetch /users/ if admin, or assume DATA_EXPERT if forbidden.
-            // A safer approach is adding /auth/me to backend. I'll mock basic assignment.
-
-            const payloadBase64 = response.data.access.split('.')[1];
-            const payloadStr = atob(payloadBase64);
-            const payload = JSON.parse(payloadStr);
-
-            // The role needs to be known. We'll add role to TokenObtainPair later if needed, 
-            // but for now let's attempt a dashboard request to check if admin.
-            try {
-                await api.get('/dashboard/stats/');
-                setUser({ email, role: 'ADMIN', user_id: payload.user_id });
-            } catch (e) {
-                setUser({ email, role: 'DATA_EXPERT', user_id: payload.user_id });
-            }
+            const meRes = await api.get('auth/me/');
+            const me = meRes.data;
+            setUser({
+                user_id: me.user_id,
+                email: me.email,
+                first_name: me.first_name || '',
+                last_name: me.last_name || '',
+                role: me.role,
+                phone_number: me.phone_number || '',
+                region: me.region,
+                pm: me.pm,
+                permission_codes: me.permission_codes || [],
+            });
 
             navigate('/dashboard');
         } catch (err) {

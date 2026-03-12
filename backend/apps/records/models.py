@@ -56,6 +56,22 @@ class ClientRegistration(models.Model):
     spss_second_delivery_date = models.DateField(null=True, blank=True)
     spss_number_children_after = models.IntegerField(null=True, blank=True)
 
+    # Third pregnancy (same structure as second)
+    spss_third_preg_date = models.DateField(null=True, blank=True)
+    spss_third_pregnancy = models.IntegerField(null=True, blank=True)
+    spss_third_breastfeeding = models.IntegerField(null=True, blank=True)
+    spss_third_antenatal = models.IntegerField(null=True, blank=True)
+    spss_third_postnatal = models.IntegerField(null=True, blank=True)
+    spss_third_immunization = models.IntegerField(null=True, blank=True)
+    spss_third_delivery_date = models.DateField(null=True, blank=True)
+    spss_third_number_children_after = models.IntegerField(null=True, blank=True)
+
+    # Flexible JSON field to store an arbitrary list of pregnancies after the first.
+    # Each item is expected to be a dict with keys like:
+    # { "preg_date", "pregnancy", "breastfeeding", "antenatal", "postnatal",
+    #   "immunization", "delivery_date", "number_children_after" }.
+    pregnancies = models.JSONField(default=list, blank=True)
+
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
