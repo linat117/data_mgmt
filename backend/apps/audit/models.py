@@ -34,11 +34,27 @@ class AuditLog(models.Model):
             'LOGIN': 'logged in'
         }.get(self.action, 'performed action on')
         
+        # Get meaningful record description
         record_part = ""
-        if self.record_id and self.table_name:
-            if 'client' in self.table_name:
-                record_part = f"record {self.record_id}"
+        if self.changes and isinstance(self.changes, str):
+            # If changes field has human-readable description, use it
+            record_part = self.changes
+        elif self.record_id and self.table_name:
+            # Try to get meaningful description based on table name
+            if 'client' in self.table_name.lower():
+                if 'followup' in self.table_name.lower():
+                    record_part = f"client follow-up record"
+                else:
+                    record_part = f"client registration record"
+            elif 'mch' in self.table_name.lower():
+                record_part = f"MCH report record"
+            elif 'weekly' in self.table_name.lower() or 'plan' in self.table_name.lower():
+                record_part = f"weekly plan record"
+            elif 'user' in self.table_name.lower():
+                record_part = f"user record"
             else:
-                record_part = f"record {self.record_id}"
+                record_part = f"record in {self.table_name}"
+        else:
+            record_part = "record"
         
         return f"{user_part} {action_desc} {record_part} at {self.timestamp.strftime('%Y-%m-%d %I:%M %p')}"
