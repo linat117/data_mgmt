@@ -5,86 +5,86 @@ import datetime
 def create_dummy_client_registrations(apps, schema_editor):
     ClientRegistration = apps.get_model('records', 'ClientRegistration')
 
-    dummy_rows = [
+    rows = [
         {
-            "mentor_mother_name": "Alemnesh Tadesse",
+            "mentor_mother_name": "Sara Johnson",
             "date": datetime.date(2026, 3, 1),
             "total_green_cases": 3,
             "total_blue_cases": 1,
-            "name": "Abebe Kebede",
+            "name": "Michael Brown",
             "age": 28,
             "sex": "M",
-            "folder_number": "DUMMY-001",
-            "address": "Bole, Addis Ababa, Ethiopia",
+            "folder_number": "CR-0001",
+            "address": "12 Oak Street, Springfield",
             "identified_problem": "Nutrition counseling needed for underweight child.",
             "counseling_given": "Provided basic nutrition counseling and follow-up schedule.",
         },
         {
-            "mentor_mother_name": "Meskerem Bekele",
+            "mentor_mother_name": "Emily Davis",
             "date": datetime.date(2026, 3, 2),
             "total_green_cases": 2,
             "total_blue_cases": 0,
-            "name": "Hirut Tesfaye",
+            "name": "Olivia Wilson",
             "age": 24,
             "sex": "F",
-            "folder_number": "DUMMY-002",
-            "address": "Piassa, Addis Ababa, Ethiopia",
+            "folder_number": "CR-0002",
+            "address": "45 Market Road, Lakeside",
             "identified_problem": "Breastfeeding support required for first-time mother.",
             "counseling_given": "Discussed exclusive breastfeeding and positioning techniques.",
         },
         {
-            "mentor_mother_name": "Selamawit Demissie",
+            "mentor_mother_name": "Linda Martinez",
             "date": datetime.date(2026, 3, 3),
             "total_green_cases": 4,
             "total_blue_cases": 2,
-            "name": "Getachew Alemu",
+            "name": "David Thompson",
             "age": 32,
             "sex": "M",
-            "folder_number": "DUMMY-003",
-            "address": "Hawassa, Sidama, Ethiopia",
+            "folder_number": "CR-0003",
+            "address": "88 Hilltop Avenue, Riverside",
             "identified_problem": "Poor dietary diversity in household meals.",
             "counseling_given": "Provided education on locally available diverse foods.",
         },
         {
-            "mentor_mother_name": "Martha Wolde",
+            "mentor_mother_name": "Patricia Miller",
             "date": datetime.date(2026, 3, 4),
             "total_green_cases": 1,
             "total_blue_cases": 1,
-            "name": "Rahel Solomon",
+            "name": "Sophia Anderson",
             "age": 21,
             "sex": "F",
-            "folder_number": "DUMMY-004",
-            "address": "Bahir Dar, Amhara, Ethiopia",
+            "folder_number": "CR-0004",
+            "address": "7 Garden Lane, Fairview",
             "identified_problem": "Lack of awareness on antenatal care visits.",
             "counseling_given": "Explained importance and schedule of ANC visits.",
         },
         {
-            "mentor_mother_name": "Hanna Hailemariam",
+            "mentor_mother_name": "Jessica Taylor",
             "date": datetime.date(2026, 3, 5),
             "total_green_cases": 5,
             "total_blue_cases": 0,
-            "name": "Yared Fikre",
+            "name": "Daniel Harris",
             "age": 30,
             "sex": "M",
-            "folder_number": "DUMMY-005",
-            "address": "Adama, Oromia, Ethiopia",
+            "folder_number": "CR-0005",
+            "address": "101 Sunset Boulevard, Brookfield",
             "identified_problem": "Child not gaining weight as expected.",
             "counseling_given": "Reviewed feeding frequency and referred for further assessment.",
         },
     ]
 
-    for row in dummy_rows:
+    for row in rows:
         ClientRegistration.objects.create(**row)
 
 
 def delete_dummy_client_registrations(apps, schema_editor):
     ClientRegistration = apps.get_model('records', 'ClientRegistration')
     ClientRegistration.objects.filter(folder_number__in=[
-        "DUMMY-001",
-        "DUMMY-002",
-        "DUMMY-003",
-        "DUMMY-004",
-        "DUMMY-005",
+        "CR-0001",
+        "CR-0002",
+        "CR-0003",
+        "CR-0004",
+        "CR-0005",
     ]).delete()
 
 

@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions
 from django.contrib.auth import get_user_model
-from apps.records.models import ClientRegistration, MCHReport, WeeklyPlan
+from apps.records.models import ClientRegistration, ClientFollowUp, MCHReport, WeeklyPlan
 
 User = get_user_model()
 
@@ -47,15 +47,18 @@ class DashboardStatsView(APIView):
             total_clients = ClientRegistration.objects.count()
             total_mch_reports = MCHReport.objects.count()
             total_weekly_plans = WeeklyPlan.objects.count()
+            total_followups = ClientFollowUp.objects.count()
         else:
             total_users = User.objects.filter(id__in=user_ids).count()
             total_clients = ClientRegistration.objects.filter(created_by_id__in=user_ids).count()
             total_mch_reports = MCHReport.objects.filter(created_by_id__in=user_ids).count()
             total_weekly_plans = WeeklyPlan.objects.filter(created_by_id__in=user_ids).count()
+            total_followups = ClientFollowUp.objects.filter(created_by_id__in=user_ids).count()
 
         return Response({
             "total_users": total_users,
             "total_clients": total_clients,
             "total_mch_reports": total_mch_reports,
             "total_weekly_plans": total_weekly_plans,
+            "total_followups": total_followups,
         })

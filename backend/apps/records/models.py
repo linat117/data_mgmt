@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from django.conf import settings
 
+
 class ClientRegistration(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     mentor_mother_name = models.CharField(max_length=255)
@@ -78,6 +79,27 @@ class ClientRegistration(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.date}"
+
+
+class ClientFollowUp(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    client = models.ForeignKey(
+        ClientRegistration,
+        on_delete=models.CASCADE,
+        related_name="followups",
+    )
+    date = models.DateField(auto_now_add=True)
+    notes = models.TextField(blank=True)
+    data = models.JSONField(default=dict, blank=True)
+
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        client_name = getattr(self.client, "name", None) or str(self.client_id)
+        return f"Follow-up for {client_name} on {self.date}"
+
 
 class MCHReport(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

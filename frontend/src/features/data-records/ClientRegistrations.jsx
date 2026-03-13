@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { getAllClients, createClient, updateClient, deleteClient, getMentorMothers } from '../../services/recordService';
+import { getAllClients, createClient, updateClient, deleteClient, getMentorMothers, getClientFollowUps, createClientFollowUp, getAllReports, getAllPlans } from '../../services/recordService';
 import { useAuthStore } from '../../store/authStore';
-import { X, Eye, Pencil, Trash2 } from 'lucide-react';
+import { X, Eye, Pencil, Trash2, FileText } from 'lucide-react';
 import { DATA_RECORD_SECTIONS, VALUE_LABELS, getLabelForValue } from './dataRecordFormStructure';
+import {
+    ResponsiveContainer,
+    BarChart,
+    Bar,
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    Tooltip,
+    CartesianGrid,
+    Legend,
+} from 'recharts';
 
 const getInitialFormData = () => ({
     mentor_mother_name: '',
@@ -111,6 +123,26 @@ const ClientRegistrations = ({ openModalRef }) => {
     const [mentorFilter, setMentorFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [pregnancies, setPregnancies] = useState([]);
+    const [followUpsByClient, setFollowUpsByClient] = useState({});
+    const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+    const [followUpClient, setFollowUpClient] = useState(null);
+    const [followUpForm, setFollowUpForm] = useState({
+        notes: '',
+        weight: '',
+        muac: '',
+        identified_problem: '',
+        counseling_given: '',
+        anything_additional: '',
+        problem_faced_by_mm: '',
+    });
+    const [viewFollowUpDetail, setViewFollowUpDetail] = useState(null);
+    const [reportClient, setReportClient] = useState(null);
+    const [reportFollowUps, setReportFollowUps] = useState([]);
+    const [reportMch, setReportMch] = useState([]);
+    const [reportPlans, setReportPlans] = useState([]);
+    const [reportLoading, setReportLoading] = useState(false);
+    const [followUpHistoryField, setFollowUpHistoryField] = useState(null);
+    const [expandedFollowUps, setExpandedFollowUps] = useState(new Set());
 
     const fetchClients = async () => {
         try {
@@ -139,6 +171,13 @@ const ClientRegistrations = ({ openModalRef }) => {
     useEffect(() => {
         if (showModal) fetchMentorMothers();
     }, [showModal]);
+
+    useEffect(() => {
+        // Close history dropdown when follow-up modal closes
+        if (!showFollowUpModal) {
+            setFollowUpHistoryField(null);
+        }
+    }, [showFollowUpModal]);
 
     useEffect(() => {
         if (openModalRef) {
@@ -424,6 +463,217 @@ const ClientRegistrations = ({ openModalRef }) => {
         return `${base} pregnancy`;
     };
 
+    const openFollowUp = async (client) => {
+        try {
+            setFollowUpClient(client);
+            setFollowUpForm({
+                notes: '',
+                weight: client.weight || '',
+                muac: client.muac || '',
+                identified_problem: client.identified_problem || '',
+                counseling_given: client.counseling_given || '',
+                anything_additional: client.anything_additional || '',
+                problem_faced_by_mm: client.problem_faced_by_mm || '',
+            });
+            const res = await getClientFollowUps(client.id);
+            const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
+            setFollowUpsByClient((prev) => ({ ...prev, [client.id]: list }));
+            setShowFollowUpModal(true);
+        } catch (err) {
+            console.error('Failed to load follow-ups', err);
+            alert('Failed to load follow-ups for this client.');
+        }
+    };
+
+    const handleFollowUpChange = (e) => {
+        const { name, value } = e.target;
+        setFollowUpForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const saveFollowUp = async (e) => {
+        e.preventDefault();
+        if (!followUpClient) return;
+        try {
+            const payload = {
+                client: followUpClient.id,
+                notes: followUpForm.notes || '',
+                data: {
+                    weight: followUpForm.weight || null,
+                    muac: followUpForm.muac || null,
+                    identified_problem: followUpForm.identified_problem || '',
+                    counseling_given: followUpForm.counseling_given || '',
+                    anything_additional: followUpForm.anything_additional || '',
+                    problem_faced_by_mm: followUpForm.problem_faced_by_mm || '',
+                },
+            };
+            const res = await createClientFollowUp(payload);
+            const created = res.data;
+            setFollowUpsByClient((prev) => {
+                const existing = prev[followUpClient.id] || [];
+                return { ...prev, [followUpClient.id]: [created, ...existing] };
+            });
+            fetchClients();
+            setFollowUpForm((prev) => ({ ...prev, notes: '' }));
+        } catch (err) {
+            console.error('Failed to save follow-up', err);
+            alert('Failed to save follow-up.');
+        }
+    };
+
+    const closeFollowUpModal = () => {
+        setShowFollowUpModal(false);
+        setFollowUpClient(null);
+    };
+
+    const openReport = async (client) => {
+        setReportClient(client);
+        setReportLoading(true);
+        setReportFollowUps([]);
+        setReportMch([]);
+        setReportPlans([]);
+        try {
+            const [fuRes, reportsRes, plansRes] = await Promise.all([
+                getClientFollowUps(client.id),
+                getAllReports(),
+                getAllPlans(),
+            ]);
+            const fuList = Array.isArray(fuRes.data) ? fuRes.data : (fuRes.data?.results || []);
+            setReportFollowUps(fuList);
+            const reports = Array.isArray(reportsRes.data) ? reportsRes.data : (reportsRes.data?.results || []);
+            const plans = Array.isArray(plansRes.data) ? plansRes.data : (plansRes.data?.results || []);
+            setReportMch(reports.filter((r) => r.mentor_mother_name === client.mentor_mother_name && r.date === client.date));
+            setReportPlans(plans.filter((p) => (p.client_name || '').toLowerCase().includes((client.name || '').toLowerCase())));
+        } catch (err) {
+            console.error('Failed to load report data', err);
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
+    const closeReport = () => {
+        setReportClient(null);
+        setReportFollowUps([]);
+        setReportMch([]);
+        setReportPlans([]);
+        setViewFollowUpDetail(null);
+    };
+
+    const getFollowUpHistoryForField = (fieldKey) => {
+        const list = followUpClient ? (followUpsByClient[followUpClient.id] || []) : [];
+        
+        return list.map((fu) => {
+            const value = fieldKey === 'notes' ? (fu.notes || '') : ((fu.data || {})[fieldKey] ?? '');
+            const date = fu.date || (fu.created_at && fu.created_at.split('T')[0]) || '—';
+            const by = fu.created_by_name || fu.created_by_email || '—';
+            return { fu, value, date, by };
+        }).filter(({ value }) => {
+            // Include meaningful values - handle strings, numbers, and other types
+            if (value === null || value === undefined) return false;
+            if (typeof value === 'string') return value.trim() !== '';
+            if (typeof value === 'number') return true; // Include zero values for numbers
+            return Boolean(value);
+        });
+    };
+
+    const openFollowUpDetailFromHistory = (fu) => {
+        setViewFollowUpDetail(fu);
+        setFollowUpHistoryField(null);
+    };
+
+    const toggleFollowUpExpansion = (fuId) => {
+        setExpandedFollowUps(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(fuId)) {
+                newSet.delete(fuId);
+            } else {
+                newSet.add(fuId);
+            }
+            return newSet;
+        });
+    };
+
+    const FollowUpHistoryBtn = ({ fieldKey, label }) => {
+        const isOpen = followUpHistoryField === fieldKey;
+        const history = getFollowUpHistoryForField(fieldKey);
+        
+        return (
+            <span className="relative inline-flex items-center gap-1 ml-1">
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setFollowUpHistoryField(isOpen ? null : fieldKey);
+                    }}
+                    className="px-2 py-1 text-xs rounded text-neutral-400 hover:text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 border border-neutral-300 cursor-pointer"
+                    title={`Previous ${label} values`}
+                    aria-expanded={isOpen}
+                    aria-haspopup="true"
+                    style={{ pointerEvents: 'auto' }}
+                >
+                    <span style={{ pointerEvents: 'none' }}>History</span>
+                </button>
+                {isOpen && (
+                    <>
+                        <div 
+                            className="fixed inset-0 z-50" 
+                            onClick={(e) => {
+                                e.preventDefault();
+                                setFollowUpHistoryField(null);
+                            }} 
+                            aria-hidden="true" 
+                        />
+                        <div className="absolute left-0 top-full mt-1 z-[60] min-w-[250px] max-w-sm max-h-64 overflow-y-auto bg-white border border-neutral-200 rounded-md shadow-xl py-1 text-xs">
+                            {history.length === 0 ? (
+                                <div className="px-3 py-2 text-neutral-500 italic">No previous values found</div>
+                            ) : (
+                                history.map(({ fu, value, date, by }) => (
+                                    <button
+                                        key={fu.id}
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            openFollowUpDetailFromHistory(fu);
+                                        }}
+                                        className="w-full text-left px-3 py-2 hover:bg-neutral-50 border-b border-neutral-100 last:border-0 transition-colors"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium text-neutral-700">{date}</span>
+                                            <span className="text-neutral-500 text-xs">by {by}</span>
+                                        </div>
+                                        <p className="mt-1 text-neutral-800 truncate" title={String(value)}>{String(value).slice(0, 60)}{String(value).length > 60 ? '…' : ''}</p>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </>
+                )}
+            </span>
+        );
+    };
+
+    const buildWeightMuacChartData = () => {
+        if (!reportClient) return [];
+        const points = [];
+        const regDate = reportClient.date;
+        const w = reportClient.weight != null && reportClient.weight !== '' ? Number(reportClient.weight) : null;
+        const m = reportClient.muac != null && reportClient.muac !== '' ? Number(reportClient.muac) : null;
+        if (regDate && (w != null || m != null)) {
+            points.push({ date: regDate, weight: w, muac: m, label: 'Registration' });
+        }
+        (reportFollowUps || []).forEach((fu, i) => {
+            const d = fu.date || (fu.created_at && fu.created_at.split('T')[0]);
+            const data = fu.data || {};
+            const fw = data.weight != null && data.weight !== '' ? Number(data.weight) : null;
+            const fm = data.muac != null && data.muac !== '' ? Number(data.muac) : null;
+            if (d && (fw != null || fm != null)) {
+                points.push({ date: d, weight: fw, muac: fm, label: `F/U ${i + 1}` });
+            }
+        });
+        return points.sort((a, b) => (a.date < b.date ? -1 : 1));
+    };
+
     return (
         <div>
             <h2 className="text-xl font-medium text-neutral-800 mb-4">Client Registrations</h2>
@@ -487,6 +737,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client Name</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
+                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Follow-ups</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -499,10 +750,20 @@ const ClientRegistrations = ({ openModalRef }) => {
                                         <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">
                                             {client.created_by_name || client.created_by_email || '—'}
                                         </td>
+                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">
+                                            {client.followup_count ?? 0}
+                                            {Array.isArray(client.followup_created_by) && client.followup_created_by.length > 0 && (
+                                                <span className="ml-1 text-xs text-neutral-400">
+                                                    by {client.followup_created_by.join(', ')}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-3 py-3 text-sm sm:px-4 sm:py-3 whitespace-nowrap text-right">
                                             <div className="flex items-center justify-end gap-1">
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); setViewClient(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Edit"><Pencil className="h-4 w-4" /></button>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); openFollowUp(client); }} className="px-2 py-1 text-xs border border-primary-500 text-primary-600 rounded hover:bg-primary-50" title="Add follow-up">F/U</button>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); openReport(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Client report"><FileText className="h-4 w-4" /></button>
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(client); }} className="p-1.5 text-neutral-500 hover:text-red-600 rounded" title="Delete"><Trash2 className="h-4 w-4" /></button>
                                             </div>
                                         </td>
@@ -510,7 +771,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                                 ))}
                                 {clients.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
+                                        <td colSpan="7" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
                                             No registrations found.
                                         </td>
                                     </tr>
@@ -885,6 +1146,445 @@ const ClientRegistrations = ({ openModalRef }) => {
                                         </form>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showFollowUpModal && followUpClient && (
+                <div className="fixed z-20 inset-0 overflow-y-auto">
+                    <div className="flex min-h-screen items-center justify-center p-2 text-center sm:p-4">
+                        <div className="fixed inset-0 transition-opacity" onClick={closeFollowUpModal}>
+                            <div className="absolute inset-0 bg-neutral-500 opacity-60"></div>
+                        </div>
+                        <div className="relative bg-white rounded-lg text-left overflow-hidden shadow-xl w-[90vw] max-w-7xl h-[95vh] max-h-[95vh] flex flex-col">
+                            <div className="px-4 pt-5 pb-3 border-b border-neutral-200 flex items-center justify-between">
+                                <h3 className="text-base sm:text-lg leading-6 font-medium text-neutral-900">
+                                    Follow-up for {followUpClient.name} ({followUpClient.folder_number || 'No folder'})
+                                </h3>
+                                <button
+                                    onClick={closeFollowUpModal}
+                                    className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded"
+                                    aria-label="Close"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                            <div className="px-4 py-4 overflow-y-auto flex-1 space-y-4 text-sm">
+                                <div className="rounded-md bg-neutral-50 border border-neutral-200 p-3">
+                                    <p className="text-sm font-medium text-neutral-800 mb-1">Previous record (summary)</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs sm:text-sm text-neutral-700">
+                                        <div><span className="font-semibold">Identified problem:</span> {followUpClient.identified_problem || '-'}</div>
+                                        <div><span className="font-semibold">Counseling given:</span> {followUpClient.counseling_given || '-'}</div>
+                                        <div><span className="font-semibold">Weight:</span> {followUpClient.weight ?? '-'}</div>
+                                        <div><span className="font-semibold">MUAC:</span> {followUpClient.muac ?? '-'}</div>
+                                    </div>
+                                </div>
+
+                                <form onSubmit={saveFollowUp} className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="flex items-center text-sm font-medium text-neutral-700">
+                                                Weight (kg)
+                                                <FollowUpHistoryBtn fieldKey="weight" label="weight" />
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                name="weight"
+                                                value={followUpForm.weight}
+                                                onChange={handleFollowUpChange}
+                                                className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="flex items-center text-sm font-medium text-neutral-700">
+                                                MUAC (cm)
+                                                <FollowUpHistoryBtn fieldKey="muac" label="MUAC" />
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                name="muac"
+                                                value={followUpForm.muac}
+                                                onChange={handleFollowUpChange}
+                                                className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-neutral-700">
+                                            Identified problem (updated)
+                                            <FollowUpHistoryBtn fieldKey="identified_problem" label="identified problem" />
+                                        </label>
+                                        <textarea
+                                            name="identified_problem"
+                                            value={followUpForm.identified_problem}
+                                            onChange={handleFollowUpChange}
+                                            rows={2}
+                                            className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-neutral-700">
+                                            Counseling given (updated)
+                                            <FollowUpHistoryBtn fieldKey="counseling_given" label="counseling given" />
+                                        </label>
+                                        <textarea
+                                            name="counseling_given"
+                                            value={followUpForm.counseling_given}
+                                            onChange={handleFollowUpChange}
+                                            rows={2}
+                                            className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-neutral-700">
+                                            Anything additional
+                                            <FollowUpHistoryBtn fieldKey="anything_additional" label="anything additional" />
+                                        </label>
+                                        <textarea
+                                            name="anything_additional"
+                                            value={followUpForm.anything_additional}
+                                            onChange={handleFollowUpChange}
+                                            rows={2}
+                                            className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-neutral-700">
+                                            Problem faced by MM
+                                            <FollowUpHistoryBtn fieldKey="problem_faced_by_mm" label="problem faced by MM" />
+                                        </label>
+                                        <textarea
+                                            name="problem_faced_by_mm"
+                                            value={followUpForm.problem_faced_by_mm}
+                                            onChange={handleFollowUpChange}
+                                            rows={2}
+                                            className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-neutral-700">
+                                            Follow-up notes
+                                            <FollowUpHistoryBtn fieldKey="notes" label="notes" />
+                                        </label>
+                                        <textarea
+                                            name="notes"
+                                            value={followUpForm.notes}
+                                            onChange={handleFollowUpChange}
+                                            rows={2}
+                                            className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
+                                        />
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={closeFollowUpModal}
+                                            className="inline-flex justify-center rounded-md border border-neutral-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                                        >
+                                            Close
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-sm font-medium text-white hover:bg-primary-700"
+                                        >
+                                            Save follow-up
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <div className="pt-4 border-t border-neutral-200">
+                                    <h4 className="text-sm font-semibold text-neutral-800 mb-2">
+                                        Previous follow-ups ({(followUpsByClient[followUpClient.id] || []).length})
+                                    </h4>
+                                    {!(followUpsByClient[followUpClient.id] || []).length ? (
+                                        <p className="text-xs text-neutral-500">No follow-ups recorded yet.</p>
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {[...followUpsByClient[followUpClient.id]].reverse().map((fu, index) => {
+                                                const originalIndex = followUpsByClient[followUpClient.id].length - 1 - index;
+                                                const isExpanded = expandedFollowUps.has(fu.id);
+                                                return (
+                                                    <div key={fu.id} className="border border-neutral-200 rounded-md">
+                                                        <div 
+                                                            className="flex items-center justify-between px-3 py-2 bg-neutral-50 border-b border-neutral-200 cursor-pointer hover:bg-neutral-100"
+                                                            onClick={() => toggleFollowUpExpansion(fu.id)}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <svg 
+                                                                    className={`w-4 h-4 text-neutral-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} 
+                                                                    fill="none" 
+                                                                    stroke="currentColor" 
+                                                                    viewBox="0 0 24 24"
+                                                                >
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                                </svg>
+                                                                <span className="text-sm font-medium text-neutral-700">
+                                                                    Follow-up {originalIndex + 1}
+                                                                </span>
+                                                                <span className="text-xs text-neutral-500">
+                                                                    {fu.date || (fu.created_at && new Date(fu.created_at).toLocaleDateString())}
+                                                                </span>
+                                                                <span className="text-xs text-neutral-500">
+                                                                    by {fu.created_by_name || fu.created_by_email || '—'}
+                                                                </span>
+                                                            </div>
+                                                            <button 
+                                                                type="button"
+                                                                className="text-xs text-primary-600 hover:text-primary-700"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setViewFollowUpDetail(fu);
+                                                                }}
+                                                            >
+                                                                View detail →
+                                                            </button>
+                                                        </div>
+                                                        {isExpanded && (
+                                                            <>
+                                                                {fu.notes && (
+                                                                    <div className="px-3 py-2 text-xs text-neutral-600 bg-white border-b border-neutral-100">
+                                                                        <span className="font-medium">Notes:</span> {fu.notes}
+                                                                    </div>
+                                                                )}
+                                                                {fu.data && typeof fu.data === 'object' && Object.keys(fu.data).length > 0 && (
+                                                                    <div className="px-3 py-2 text-xs text-neutral-600 bg-white">
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            {fu.data.weight != null && fu.data.weight !== '' && (
+                                                                                <div><span className="font-medium">Weight:</span> {fu.data.weight}kg</div>
+                                                                            )}
+                                                                            {fu.data.muac != null && fu.data.muac !== '' && (
+                                                                                <div><span className="font-medium">MUAC:</span> {fu.data.muac}cm</div>
+                                                                            )}
+                                                                            {fu.data.identified_problem && (
+                                                                                <div className="col-span-2"><span className="font-medium">Problem:</span> {fu.data.identified_problem}</div>
+                                                                            )}
+                                                                            {fu.data.counseling_given && (
+                                                                                <div className="col-span-2"><span className="font-medium">Counseling:</span> {fu.data.counseling_given}</div>
+                                                                            )}
+                                                                            {fu.data.anything_additional && (
+                                                                                <div className="col-span-2"><span className="font-medium">Additional:</span> {fu.data.anything_additional}</div>
+                                                                            )}
+                                                                            {fu.data.problem_faced_by_mm && (
+                                                                                <div className="col-span-2"><span className="font-medium">MM Problem:</span> {fu.data.problem_faced_by_mm}</div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Follow-up detail modal */}
+            {viewFollowUpDetail && (
+                <div className="fixed z-30 inset-0 overflow-y-auto">
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-neutral-500 opacity-60" onClick={() => setViewFollowUpDetail(null)} />
+                        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-lg">
+                            <div className="px-4 pt-4 pb-2 border-b border-neutral-200 flex justify-between items-center">
+                                <h3 className="text-base font-medium text-neutral-900">Follow-up detail</h3>
+                                <button onClick={() => setViewFollowUpDetail(null)} className="p-1 text-neutral-400 hover:text-neutral-600 rounded"><X className="h-5 w-5" /></button>
+                            </div>
+                            <div className="px-4 py-4 space-y-3 text-sm">
+                                <div className="flex flex-wrap gap-4">
+                                    <span><span className="font-semibold">Date:</span> {viewFollowUpDetail.date || (viewFollowUpDetail.created_at && new Date(viewFollowUpDetail.created_at).toLocaleString())}</span>
+                                    <span><span className="font-semibold">By:</span> {viewFollowUpDetail.created_by_name || viewFollowUpDetail.created_by_email || '—'}</span>
+                                </div>
+                                {viewFollowUpDetail.notes && (
+                                    <div><span className="font-semibold">Notes:</span><p className="mt-1 text-neutral-700">{viewFollowUpDetail.notes}</p></div>
+                                )}
+                                {viewFollowUpDetail.data && typeof viewFollowUpDetail.data === 'object' && Object.keys(viewFollowUpDetail.data).length > 0 && (
+                                    <div className="border-t border-neutral-200 pt-3">
+                                        <p className="font-semibold text-neutral-800 mb-2">Recorded data</p>
+                                        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {viewFollowUpDetail.data.weight != null && viewFollowUpDetail.data.weight !== '' && <><dt className="text-neutral-500">Weight (kg)</dt><dd>{viewFollowUpDetail.data.weight}</dd></>}
+                                            {viewFollowUpDetail.data.muac != null && viewFollowUpDetail.data.muac !== '' && <><dt className="text-neutral-500">MUAC (cm)</dt><dd>{viewFollowUpDetail.data.muac}</dd></>}
+                                            {viewFollowUpDetail.data.identified_problem && <><dt className="text-neutral-500">Identified problem</dt><dd className="sm:col-span-1">{viewFollowUpDetail.data.identified_problem}</dd></>}
+                                            {viewFollowUpDetail.data.counseling_given && <><dt className="text-neutral-500">Counseling given</dt><dd className="sm:col-span-1">{viewFollowUpDetail.data.counseling_given}</dd></>}
+                                            {viewFollowUpDetail.data.anything_additional && <><dt className="text-neutral-500">Anything additional</dt><dd className="sm:col-span-1">{viewFollowUpDetail.data.anything_additional}</dd></>}
+                                            {viewFollowUpDetail.data.problem_faced_by_mm && <><dt className="text-neutral-500">Problem faced by MM</dt><dd className="sm:col-span-1">{viewFollowUpDetail.data.problem_faced_by_mm}</dd></>}
+                                        </dl>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Client report modal */}
+            {reportClient && (
+                <div className="fixed z-20 inset-0 overflow-y-auto">
+                    <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+                        <div className="fixed inset-0 bg-neutral-500 opacity-60" onClick={closeReport} />
+                        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+                            <div className="px-4 pt-5 pb-3 border-b border-neutral-200 flex items-center justify-between flex-shrink-0">
+                                <h2 className="text-lg font-semibold text-neutral-900">Client report – {reportClient.name} ({reportClient.folder_number || '—'})</h2>
+                                <button onClick={closeReport} className="p-1 text-neutral-400 hover:text-neutral-600 rounded"><X className="h-5 w-5" /></button>
+                            </div>
+                            <div className="px-4 py-4 overflow-y-auto flex-1 space-y-6 text-sm">
+                                {reportLoading ? (
+                                    <p className="text-neutral-500">Loading report...</p>
+                                ) : (
+                                    <>
+                                        <section>
+                                            <h3 className="text-sm font-semibold text-neutral-800 mb-2">Summary</h3>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md bg-neutral-50 p-3">
+                                                <div><span className="text-neutral-500">Mentor Mother</span><br />{reportClient.mentor_mother_name || '—'}</div>
+                                                <div><span className="text-neutral-500">Date</span><br />{reportClient.date || '—'}</div>
+                                                <div><span className="text-neutral-500">Age / Sex</span><br />{reportClient.age ?? '—'} / {reportClient.sex || '—'}</div>
+                                                <div><span className="text-neutral-500">Added by</span><br />{reportClient.created_by_name || reportClient.created_by_email || '—'}</div>
+                                                <div className="col-span-2 sm:col-span-4"><span className="text-neutral-500">Address</span><br />{reportClient.address || '—'}</div>
+                                            </div>
+                                        </section>
+
+                                        <section>
+                                            <h3 className="text-sm font-semibold text-neutral-800 mb-2">Registration (key fields)</h3>
+                                            <div className="overflow-x-auto border border-neutral-200 rounded-md">
+                                                <table className="min-w-full text-sm">
+                                                    <thead className="bg-neutral-50"><tr><th className="px-3 py-2 text-left">Field</th><th className="px-3 py-2 text-left">Value</th></tr></thead>
+                                                    <tbody className="divide-y divide-neutral-100">
+                                                        <tr><td className="px-3 py-2 text-neutral-600">Weight (kg)</td><td className="px-3 py-2">{reportClient.weight ?? '—'}</td></tr>
+                                                        <tr><td className="px-3 py-2 text-neutral-600">MUAC (cm)</td><td className="px-3 py-2">{reportClient.muac ?? '—'}</td></tr>
+                                                        <tr><td className="px-3 py-2 text-neutral-600">Identified problem</td><td className="px-3 py-2">{reportClient.identified_problem || '—'}</td></tr>
+                                                        <tr><td className="px-3 py-2 text-neutral-600">Counseling given</td><td className="px-3 py-2">{reportClient.counseling_given || '—'}</td></tr>
+                                                        <tr><td className="px-3 py-2 text-neutral-600">Problem faced by MM</td><td className="px-3 py-2">{reportClient.problem_faced_by_mm || '—'}</td></tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </section>
+
+                                        <section>
+                                            <h3 className="text-sm font-semibold text-neutral-800 mb-2">Follow-ups ({reportFollowUps.length})</h3>
+                                            {reportFollowUps.length === 0 ? (
+                                                <p className="text-neutral-500">No follow-ups recorded.</p>
+                                            ) : (
+                                                <div className="overflow-x-auto border border-neutral-200 rounded-md">
+                                                    <table className="min-w-full text-sm">
+                                                        <thead className="bg-neutral-50">
+                                                            <tr>
+                                                                <th className="px-3 py-2 text-left">Date</th>
+                                                                <th className="px-3 py-2 text-left">By</th>
+                                                                <th className="px-3 py-2 text-left">Notes</th>
+                                                                <th className="px-3 py-2 text-left">Action</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-neutral-100">
+                                                            {reportFollowUps.map((fu) => (
+                                                                <tr key={fu.id}>
+                                                                    <td className="px-3 py-2">{fu.date || (fu.created_at && fu.created_at.split('T')[0])}</td>
+                                                                    <td className="px-3 py-2">{fu.created_by_name || fu.created_by_email || '—'}</td>
+                                                                    <td className="px-3 py-2 max-w-xs truncate">{fu.notes || '—'}</td>
+                                                                    <td className="px-3 py-2"><button type="button" onClick={() => setViewFollowUpDetail(fu)} className="text-primary-600 hover:text-primary-700 text-xs">View detail</button></td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </section>
+
+                                        {buildWeightMuacChartData().length > 0 && (
+                                            <section>
+                                                <h3 className="text-sm font-semibold text-neutral-800 mb-2">Weight & MUAC over time</h3>
+                                                <div className="h-64 w-full">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <LineChart data={buildWeightMuacChartData()} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                                                            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                                                            <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                                                            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+                                                            <Tooltip />
+                                                            <Legend />
+                                                            <Line yAxisId="left" type="monotone" dataKey="weight" name="Weight (kg)" stroke="#0d9488" strokeWidth={2} dot={{ r: 4 }} />
+                                                            <Line yAxisId="right" type="monotone" dataKey="muac" name="MUAC (cm)" stroke="#0891b2" strokeWidth={2} dot={{ r: 4 }} />
+                                                        </LineChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        <section>
+                                            <h3 className="text-sm font-semibold text-neutral-800 mb-2">Follow-ups by date</h3>
+                                            {reportFollowUps.length === 0 ? (
+                                                <p className="text-neutral-500">No data for chart.</p>
+                                            ) : (
+                                                (() => {
+                                                    const byDate = {};
+                                                    reportFollowUps.forEach((fu) => {
+                                                        const d = fu.date || (fu.created_at && fu.created_at.split('T')[0]) || '—';
+                                                        byDate[d] = (byDate[d] || 0) + 1;
+                                                    });
+                                                    const chartData = Object.entries(byDate).map(([date, count]) => ({ date, count })).sort((a, b) => (a.date < b.date ? -1 : 1));
+                                                    return (
+                                                        <div className="h-48 w-full">
+                                                            <ResponsiveContainer width="100%" height="100%">
+                                                                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
+                                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
+                                                                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                                                                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                                                    <Tooltip />
+                                                                    <Bar dataKey="count" name="Follow-ups" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                                                                </BarChart>
+                                                            </ResponsiveContainer>
+                                                        </div>
+                                                    );
+                                                })()
+                                            )}
+                                        </section>
+
+                                        {reportMch.length > 0 && (
+                                            <section>
+                                                <h3 className="text-sm font-semibold text-neutral-800 mb-2">Related MCH reports (same mentor & date)</h3>
+                                                <div className="overflow-x-auto border border-neutral-200 rounded-md">
+                                                    <table className="min-w-full text-sm">
+                                                        <thead className="bg-neutral-50"><tr><th className="px-3 py-2 text-left">Date</th><th className="px-3 py-2 text-left">Total Green</th><th className="px-3 py-2 text-left">Total Blue</th></tr></thead>
+                                                        <tbody className="divide-y divide-neutral-100">
+                                                            {reportMch.map((r) => (
+                                                                <tr key={r.id}><td className="px-3 py-2">{r.date}</td><td className="px-3 py-2">{r.total_green ?? 0}</td><td className="px-3 py-2">{r.total_blue ?? 0}</td></tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        {reportPlans.length > 0 && (
+                                            <section>
+                                                <h3 className="text-sm font-semibold text-neutral-800 mb-2">Related weekly plans</h3>
+                                                <div className="overflow-x-auto border border-neutral-200 rounded-md">
+                                                    <table className="min-w-full text-sm">
+                                                        <thead className="bg-neutral-50">
+                                                            <tr><th className="px-3 py-2 text-left">Date</th><th className="px-3 py-2 text-left">Day</th><th className="px-3 py-2 text-left">District</th><th className="px-3 py-2 text-left">Content</th></tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-neutral-100">
+                                                            {reportPlans.map((p) => (
+                                                                <tr key={p.id}>
+                                                                    <td className="px-3 py-2">{p.date}</td>
+                                                                    <td className="px-3 py-2">{p.day_of_week || '—'}</td>
+                                                                    <td className="px-3 py-2">{p.district || '—'}</td>
+                                                                    <td className="px-3 py-2 max-w-xs truncate">{p.content || '—'}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </section>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

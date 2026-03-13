@@ -139,6 +139,7 @@ const Dashboard = () => {
         { name: 'Clients', value: stats?.total_clients ?? countsFromCharts.clients ?? 0, fill: CHART_COLORS.primary },
         { name: 'MCH Reports', value: stats?.total_mch_reports ?? countsFromCharts.mchReports ?? 0, fill: CHART_COLORS.secondary },
         { name: 'Weekly Plans', value: stats?.total_weekly_plans ?? countsFromCharts.plans ?? 0, fill: CHART_COLORS.purple },
+        { name: 'Follow-ups', value: stats?.total_followups ?? 0, fill: CHART_COLORS.green },
     ];
 
     const clientPieData = [
@@ -228,6 +229,24 @@ const Dashboard = () => {
                                             <dt className="text-sm font-medium text-neutral-500 truncate">Weekly Plans</dt>
                                             <dd className="flex items-baseline">
                                                 <div className="text-2xl font-semibold text-neutral-900">{stats?.total_weekly_plans || 0}</div>
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white overflow-hidden shadow rounded-lg">
+                            <div className="p-4 sm:p-5">
+                                <div className="flex items-center">
+                                    <div className="flex-shrink-0">
+                                        <Activity className="h-6 w-6 text-green-500" />
+                                    </div>
+                                    <div className="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt className="text-sm font-medium text-neutral-500 truncate">Client Follow-ups</dt>
+                                            <dd className="flex items-baseline">
+                                                <div className="text-2xl font-semibold text-neutral-900">{stats?.total_followups || 0}</div>
                                             </dd>
                                         </dl>
                                     </div>

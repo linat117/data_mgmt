@@ -23,6 +23,12 @@ export const createClient = (data) => api.post('/records/clients/', data);
 export const updateClient = (id, data) => api.patch(`/records/clients/${id}/`, data);
 export const deleteClient = (id) => api.delete(`/records/clients/${id}/`);
 
+/** Client follow-ups */
+export const getClientFollowUps = (clientId) =>
+    api.get('/records/client-followups/', { params: { client: clientId } });
+
+export const createClientFollowUp = (data) => api.post('/records/client-followups/', data);
+
 /** Single-page fetch (used by dashboard). */
 export const getReports = () => api.get('/records/mch-reports/');
 

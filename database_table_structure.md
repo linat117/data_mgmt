@@ -104,3 +104,14 @@
   - `delivery_date`: date, optional.
   - `number_children_after`: integer, optional (children count after this pregnancy).
 
+### Table: ClientFollowUp
+
+- **id**: UUID, primary key.
+- **client_id**: FK to `ClientRegistration`, required.
+- **date**: date, required (defaults to creation date).
+- **notes**: text, optional (summary of the follow-up).
+- **data**: JSON, optional – structured follow-up data (e.g. updated weight, MUAC, problems, counseling).
+- **created_by**: FK to user, nullable.
+- **created_at**: datetime.
+- **updated_at**: datetime.
+

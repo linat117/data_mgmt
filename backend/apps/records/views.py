@@ -5,8 +5,13 @@ from itertools import chain
 from django.contrib.auth import get_user_model
 from django.db import models
 
-from .models import ClientRegistration, MCHReport, WeeklyPlan
-from .serializers import ClientRegistrationSerializer, MCHReportSerializer, WeeklyPlanSerializer
+from .models import ClientRegistration, ClientFollowUp, MCHReport, WeeklyPlan
+from .serializers import (
+    ClientRegistrationSerializer,
+    ClientFollowUpSerializer,
+    MCHReportSerializer,
+    WeeklyPlanSerializer,
+)
 from apps.audit.services import log_audit_action
 
 User = get_user_model()
@@ -61,6 +66,12 @@ class BaseMCHViewSet(viewsets.ModelViewSet):
 class ClientRegistrationViewSet(BaseMCHViewSet):
     queryset = ClientRegistration.objects.all()
     serializer_class = ClientRegistrationSerializer
+
+    def get_queryset(self):
+        qs = records_queryset_for_user(self.queryset.model, self.request.user)
+        return qs.order_by("-created_at").select_related("created_by").prefetch_related(
+            "followups__created_by"
+        )
 
     def perform_create(self, serializer):
         """
@@ -129,6 +140,18 @@ class MCHReportViewSet(BaseMCHViewSet):
 class WeeklyPlanViewSet(BaseMCHViewSet):
     queryset = WeeklyPlan.objects.all()
     serializer_class = WeeklyPlanSerializer
+
+
+class ClientFollowUpViewSet(BaseMCHViewSet):
+    queryset = ClientFollowUp.objects.all()
+    serializer_class = ClientFollowUpSerializer
+
+    def get_queryset(self):
+        qs = records_queryset_for_user(self.queryset.model, self.request.user)
+        client_id = self.request.query_params.get("client")
+        if client_id:
+            qs = qs.filter(client_id=client_id)
+        return qs.order_by("-created_at").select_related("created_by", "client")
 
 
 def mentor_mother_names_queryset(request):

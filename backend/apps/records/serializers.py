@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ClientRegistration, MCHReport, WeeklyPlan
+from .models import ClientRegistration, ClientFollowUp, MCHReport, WeeklyPlan
 
 
 def get_created_by_email(obj):
@@ -32,6 +32,8 @@ class ClientRegistrationSerializer(serializers.ModelSerializer):
     created_by_region_id = serializers.SerializerMethodField(read_only=True)
     created_by_region_name = serializers.SerializerMethodField(read_only=True)
     created_by_region_code = serializers.SerializerMethodField(read_only=True)
+    followup_count = serializers.SerializerMethodField(read_only=True)
+    followup_created_by = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ClientRegistration
@@ -56,6 +58,23 @@ class ClientRegistrationSerializer(serializers.ModelSerializer):
         _, _, code = get_created_by_region_fields(obj)
         return code
 
+    def get_followup_count(self, obj):
+        qs = getattr(obj, "followups", None)
+        if qs is None:
+            return 0
+        return qs.count()
+
+    def get_followup_created_by(self, obj):
+        qs = getattr(obj, "followups", None)
+        if qs is None:
+            return []
+        names = []
+        for fu in qs.all():
+            name = get_created_by_name(fu) or get_created_by_email(fu)
+            if name and name not in names:
+                names.append(name)
+        return names
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["created_by_email"] = self.get_created_by_email(instance)
@@ -64,7 +83,25 @@ class ClientRegistrationSerializer(serializers.ModelSerializer):
         data["created_by_region_id"] = rid
         data["created_by_region_name"] = rname
         data["created_by_region_code"] = rcode
+        data["followup_count"] = self.get_followup_count(instance)
+        data["followup_created_by"] = self.get_followup_created_by(instance)
         return data
+
+
+class ClientFollowUpSerializer(serializers.ModelSerializer):
+    created_by_email = serializers.SerializerMethodField(read_only=True)
+    created_by_name = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ClientFollowUp
+        fields = "__all__"
+        read_only_fields = ["id", "created_by", "created_at", "updated_at", "date"]
+
+    def get_created_by_email(self, obj):
+        return get_created_by_email(obj)
+
+    def get_created_by_name(self, obj):
+        return get_created_by_name(obj)
 
 
 class MCHReportSerializer(serializers.ModelSerializer):
