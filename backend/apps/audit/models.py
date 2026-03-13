@@ -19,10 +19,26 @@ class AuditLog(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
+        user_part = ""
         if self.user:
             first = (getattr(self.user, "first_name", "") or "").strip()
             last = (getattr(self.user, "last_name", "") or "").strip()
-            full = " ".join(p for p in [first, last] if p) or self.user.email
+            user_part = " ".join(p for p in [first, last] if p) or self.user.email
         else:
-            full = "System"
-        return f"{full} - {self.action} - {self.table_name} at {self.timestamp}"
+            user_part = "System"
+        
+        action_desc = {
+            'CREATE': 'created',
+            'UPDATE': 'updated', 
+            'DELETE': 'deleted',
+            'LOGIN': 'logged in'
+        }.get(self.action, 'performed action on')
+        
+        record_part = ""
+        if self.record_id and self.table_name:
+            if 'client' in self.table_name:
+                record_part = f"record {self.record_id}"
+            else:
+                record_part = f"record {self.record_id}"
+        
+        return f"{user_part} {action_desc} {record_part} at {self.timestamp.strftime('%Y-%m-%d %I:%M %p')}"

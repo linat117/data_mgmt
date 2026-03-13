@@ -1172,16 +1172,17 @@ const ClientRegistrations = ({ openModalRef }) => {
                                 </button>
                             </div>
                             <div className="px-4 py-4 overflow-y-auto flex-1 space-y-4 text-sm">
-                                <div className="rounded-md bg-neutral-50 border border-neutral-200 p-3">
-                                    <p className="text-sm font-medium text-neutral-800 mb-1">Previous record (summary)</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs sm:text-sm text-neutral-700">
-                                        <div><span className="font-semibold">Identified problem:</span> {followUpClient.identified_problem || '-'}</div>
-                                        <div><span className="font-semibold">Counseling given:</span> {followUpClient.counseling_given || '-'}</div>
-                                        <div><span className="font-semibold">Weight:</span> {followUpClient.weight ?? '-'}</div>
-                                        <div><span className="font-semibold">MUAC:</span> {followUpClient.muac ?? '-'}</div>
+                                {followUpsByClient[followUpClient.id] && followUpsByClient[followUpClient.id].length > 0 && (
+                                    <div className="rounded-md bg-neutral-50 border border-neutral-200 p-3">
+                                        <p className="text-sm font-medium text-neutral-800 mb-1">Previous record (summary)</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs sm:text-sm text-neutral-700">
+                                            <div><span className="font-semibold">Identified problem:</span> {followUpsByClient[followUpClient.id][0].data?.identified_problem || followUpsByClient[followUpClient.id][0].notes || '-'}</div>
+                                            <div><span className="font-semibold">Counseling given:</span> {followUpsByClient[followUpClient.id][0].data?.counseling_given || '-'}</div>
+                                            <div><span className="font-semibold">Weight:</span> {followUpsByClient[followUpClient.id][0].data?.weight ?? '-'}</div>
+                                            <div><span className="font-semibold">MUAC:</span> {followUpsByClient[followUpClient.id][0].data?.muac ?? '-'}</div>
+                                        </div>
                                     </div>
-                                </div>
-
+                                )}
                                 <form onSubmit={saveFollowUp} className="space-y-4">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>

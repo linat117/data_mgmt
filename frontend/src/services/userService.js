@@ -12,3 +12,5 @@ export const deleteRegion = (id) => api.delete(`/regions/${id}/`);
 
 export const getPermissions = () => api.get('/permissions/');
 export const getMe = () => api.get('auth/me/');
+
+export const getUserFollowUps = (userId) => api.get('/client-followups/', { params: { created_by: userId } });

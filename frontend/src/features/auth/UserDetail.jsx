@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getUsers } from '../../services/userService';
+import { getUsers, getUserFollowUps } from '../../services/userService';
 import { getAllClients, getAllReports, getAllPlans } from '../../services/recordService';
 import { ArrowLeft, UserCircle } from 'lucide-react';
 
@@ -20,6 +20,7 @@ const UserDetail = () => {
     const [clients, setClients] = useState([]);
     const [reports, setReports] = useState([]);
     const [plans, setPlans] = useState([]);
+    const [followUps, setFollowUps] = useState([]);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -50,20 +51,27 @@ const UserDetail = () => {
                     .map((u) => String(u.id));
 
                 try {
-                    const [clientsRes, reportsRes, plansRes] = await Promise.all([
+                    const [clientsRes, reportsRes, plansRes, followUpsRes] = await Promise.all([
                         getAllClients(),
                         getAllReports(),
                         getAllPlans(),
+                        getUserFollowUps(userId).catch(err => {
+                            // Handle 404 or other errors gracefully
+                            console.warn('Failed to fetch follow-ups for user:', err);
+                            return { data: [] }; // Return empty array as fallback
+                        }),
                     ]);
 
                     const allClients = Array.isArray(clientsRes.data) ? clientsRes.data : [];
                     const allReports = Array.isArray(reportsRes.data) ? reportsRes.data : [];
                     const allPlans = Array.isArray(plansRes.data) ? plansRes.data : [];
+                    const allFollowUps = Array.isArray(followUpsRes.data) ? followUpsRes.data : (followUpsRes.data?.results || []);
 
                     // Filter activity based on role
                     let userClients = allClients;
                     let userReports = allReports;
                     let userPlans = allPlans;
+                    let userFollowUps = allFollowUps;
 
                     if (found.role === 'MENTOR_MOTHER') {
                         userClients = allClients.filter(
@@ -81,6 +89,11 @@ const UserDetail = () => {
                                 String(p.created_by) === idStr ||
                                 (p.mentor_mother_name && p.mentor_mother_name === userFullName)
                         );
+                        userFollowUps = allFollowUps.filter(
+                            (fu) =>
+                                String(fu.created_by) === idStr ||
+                                (fu.client && fu.client.mentor_mother_name === userFullName)
+                        );
                     } else if (found.role === 'PM') {
                         userClients = allClients.filter((c) => {
                             const createdBy = String(c.created_by);
@@ -94,16 +107,22 @@ const UserDetail = () => {
                             const createdBy = String(p.created_by);
                             return createdBy === idStr || teamMmIds.includes(createdBy);
                         });
+                        userFollowUps = allFollowUps.filter((fu) => {
+                            const createdBy = String(fu.created_by);
+                            return createdBy === idStr || teamMmIds.includes(createdBy);
+                        });
                     } else {
                         // Super Admin or other roles – just records they personally created
                         userClients = allClients.filter((c) => String(c.created_by) === idStr);
                         userReports = allReports.filter((r) => String(r.created_by) === idStr);
                         userPlans = allPlans.filter((p) => String(p.created_by) === idStr);
+                        userFollowUps = allFollowUps.filter((fu) => String(fu.created_by) === idStr);
                     }
 
                     setClients(userClients);
                     setReports(userReports);
                     setPlans(userPlans);
+                    setFollowUps(userFollowUps);
                 } catch (activityErr) {
                     console.error(activityErr);
                     setError('Failed to load user activity.');
@@ -237,7 +256,7 @@ const UserDetail = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white shadow sm:rounded-lg">
                         <div className="px-4 py-3 sm:px-6 border-b border-neutral-200 flex justify-between items-center">
                             <h3 className="text-sm font-medium text-neutral-900">MCH reports</h3>
@@ -299,6 +318,53 @@ const UserDetail = () => {
                                                     <td className="px-2 py-1 whitespace-nowrap">{p.day_of_week}</td>
                                                     <td className="px-2 py-1 whitespace-nowrap">{p.district}</td>
                                                     <td className="px-2 py-1 whitespace-nowrap">{p.client_name}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white shadow sm:rounded-lg">
+                        <div className="px-4 py-3 sm:px-6 border-b border-neutral-200 flex justify-between items-center">
+                            <h3 className="text-sm font-medium text-neutral-900">Client follow-ups</h3>
+                            {loadingActivity && <span className="text-xs text-neutral-500">Loading…</span>}
+                        </div>
+                        <div className="px-3 py-3 sm:px-6">
+                            {followUps.length === 0 ? (
+                                <p className="text-sm text-neutral-500">No follow-ups created by this user.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-neutral-200 text-sm">
+                                        <thead className="bg-neutral-50">
+                                            <tr>
+                                                <th className="px-2 py-1 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
+                                                <th className="px-2 py-1 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client</th>
+                                                <th className="px-2 py-1 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Weight</th>
+                                                <th className="px-2 py-1 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">MUAC</th>
+                                                <th className="px-2 py-1 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Notes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-200">
+                                            {followUps.map((fu) => (
+                                                <tr key={fu.id}>
+                                                    <td className="px-2 py-1 whitespace-nowrap">
+                                                        {fu.date || (fu.created_at && new Date(fu.created_at).toLocaleDateString())}
+                                                    </td>
+                                                    <td className="px-2 py-1 whitespace-nowrap">
+                                                        {fu.client ? fu.client.name : '—'}
+                                                    </td>
+                                                    <td className="px-2 py-1 whitespace-nowrap">
+                                                        {fu.data?.weight ? `${fu.data.weight}kg` : '—'}
+                                                    </td>
+                                                    <td className="px-2 py-1 whitespace-nowrap">
+                                                        {fu.data?.muac ? `${fu.data.muac}cm` : '—'}
+                                                    </td>
+                                                    <td className="px-2 py-1 max-w-xs truncate">
+                                                        {fu.notes || fu.data?.identified_problem || '—'}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>

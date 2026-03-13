@@ -149,8 +149,19 @@ class ClientFollowUpViewSet(BaseMCHViewSet):
     def get_queryset(self):
         qs = records_queryset_for_user(self.queryset.model, self.request.user)
         client_id = self.request.query_params.get("client")
+        created_by = self.request.query_params.get("created_by")
+        
+        # Apply filters
         if client_id:
             qs = qs.filter(client_id=client_id)
+        elif created_by:
+            # For Super Admin, allow filtering any user's follow-ups
+            if self.request.user.role == User.ROLE_SUPER_ADMIN:
+                qs = self.queryset.model.objects.filter(created_by_id=created_by)
+            else:
+                # For other roles, only filter within their accessible records
+                qs = qs.filter(created_by_id=created_by)
+        
         return qs.order_by("-created_at").select_related("created_by", "client")
 
 
