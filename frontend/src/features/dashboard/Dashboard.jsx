@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { getDashboardStats } from '../../services/dashboardService';
-import { getAllClients, getAllReports, getAllPlans } from '../../services/recordService';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getDashboardData, processChartData } from '../../services/optimizedDashboardService';
 import { useAuthStore } from '../../store/authStore';
 import { Users, FileText, Activity, ShieldCheck } from 'lucide-react';
 import {
@@ -31,94 +30,60 @@ const OverviewBarColors = [CHART_COLORS.neutral, CHART_COLORS.primary, CHART_COL
 const Dashboard = () => {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [chartsLoading, setChartsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [chartsError, setChartsError] = useState('');
-    const [reportCharts, setReportCharts] = useState({
+    const [chartData, setChartData] = useState({
         clients: { green: 0, blue: 0 },
         mch: { green: 0, blue: 0 },
         plansByDay: [],
+        counts: { mchReports: null, clients: null, plans: null }
     });
-    const [countsFromCharts, setCountsFromCharts] = useState({ mchReports: null, clients: null, plans: null });
     const { user, hasPermission } = useAuthStore();
     const canSeeDashboard = user?.role === 'SUPER_ADMIN' || user?.role === 'PM' || hasPermission('dashboard.view');
 
     useEffect(() => {
-        const fetchStats = async () => {
+        const fetchDashboardData = async () => {
             try {
-                const res = await getDashboardStats();
-                setStats(res.data);
+                setLoading(true);
+                const data = await getDashboardData();
+                setStats(data.stats);
+                
+                // Process chart data
+                const processedData = processChartData(data);
+                setChartData(processedData);
+                
             } catch (err) {
-                console.error('Failed to fetch stats', err);
-                setError('Failed to load dashboard statistics.');
+                console.error('Failed to fetch dashboard data', err);
+                setError('Failed to load dashboard data.');
             } finally {
                 setLoading(false);
             }
         };
 
-        const fetchReportCharts = async () => {
-            try {
-                const [clientsRes, reportsRes, plansRes] = await Promise.all([
-                    getAllClients(),
-                    getAllReports(),
-                    getAllPlans(),
-                ]);
-
-                const clients = Array.isArray(clientsRes.data) ? clientsRes.data : [];
-                const reports = Array.isArray(reportsRes.data) ? reportsRes.data : [];
-                const plans = Array.isArray(plansRes.data) ? plansRes.data : [];
-
-                const clientTotals = clients.reduce(
-                    (acc, c) => {
-                        acc.green += Number(c.total_green_cases) || 0;
-                        acc.blue += Number(c.total_blue_cases) || 0;
-                        return acc;
-                    },
-                    { green: 0, blue: 0 }
-                );
-
-                const mchTotals = reports.reduce(
-                    (acc, r) => {
-                        acc.green += Number(r.total_green) || 0;
-                        acc.blue += Number(r.total_blue) || 0;
-                        return acc;
-                    },
-                    { green: 0, blue: 0 }
-                );
-
-                const dayOrder = ['Wixata', 'Kibxata', 'Roobi', 'Kamisa', 'Jimaata'];
-                const plansByDayMap = plans.reduce((acc, p) => {
-                    const day = p.day_of_week || 'Other';
-                    acc[day] = (acc[day] || 0) + 1;
-                    return acc;
-                }, {});
-                const plansByDay = dayOrder.map((day) => ({
-                    name: day,
-                    count: plansByDayMap[day] || 0,
-                }));
-
-                setReportCharts({
-                    clients: clientTotals,
-                    mch: mchTotals,
-                    plansByDay,
-                });
-                setCountsFromCharts({ mchReports: reports.length, clients: clients.length, plans: plans.length });
-            } catch (err) {
-                console.error('Failed to fetch report charts', err);
-                setChartsError('Some report charts could not be loaded.');
-            } finally {
-                setChartsLoading(false);
-            }
-        };
-
         if (canSeeDashboard) {
-            fetchStats();
-            fetchReportCharts();
+            fetchDashboardData();
         } else {
             setLoading(false);
-            setChartsLoading(false);
         }
     }, [canSeeDashboard]);
+
+    // Memoize chart data to prevent unnecessary re-renders
+    const overviewData = useMemo(() => [
+        { name: 'Users', value: stats?.total_users ?? 0, fill: CHART_COLORS.neutral },
+        { name: 'Clients', value: stats?.total_clients ?? chartData.counts.clients ?? 0, fill: CHART_COLORS.primary },
+        { name: 'MCH Reports', value: stats?.total_mch_reports ?? chartData.counts.mchReports ?? 0, fill: CHART_COLORS.secondary },
+        { name: 'Weekly Plans', value: stats?.total_weekly_plans ?? chartData.counts.plans ?? 0, fill: CHART_COLORS.purple },
+        { name: 'Follow-ups', value: stats?.total_followups ?? 0, fill: CHART_COLORS.green },
+    ], [stats, chartData.counts]);
+
+    const clientPieData = useMemo(() => [
+        { name: 'Green (Mothers)', value: chartData.clients.green, fill: CHART_COLORS.green },
+        { name: 'Blue (Children)', value: chartData.clients.blue, fill: CHART_COLORS.blue },
+    ].filter((d) => d.value > 0), [chartData.clients]);
+
+    const mchPieData = useMemo(() => [
+        { name: 'Green (Mothers)', value: chartData.mch.green, fill: CHART_COLORS.green },
+        { name: 'Blue (Children)', value: chartData.mch.blue, fill: CHART_COLORS.blue },
+    ].filter((d) => d.value > 0), [chartData.mch]);
 
     if (!canSeeDashboard) {
         return (
@@ -134,31 +99,13 @@ const Dashboard = () => {
         );
     }
 
-    const overviewData = [
-        { name: 'Users', value: stats?.total_users ?? 0, fill: CHART_COLORS.neutral },
-        { name: 'Clients', value: stats?.total_clients ?? countsFromCharts.clients ?? 0, fill: CHART_COLORS.primary },
-        { name: 'MCH Reports', value: stats?.total_mch_reports ?? countsFromCharts.mchReports ?? 0, fill: CHART_COLORS.secondary },
-        { name: 'Weekly Plans', value: stats?.total_weekly_plans ?? countsFromCharts.plans ?? 0, fill: CHART_COLORS.purple },
-        { name: 'Follow-ups', value: stats?.total_followups ?? 0, fill: CHART_COLORS.green },
-    ];
-
-    const clientPieData = [
-        { name: 'Green (Mothers)', value: reportCharts.clients.green, fill: CHART_COLORS.green },
-        { name: 'Blue (Children)', value: reportCharts.clients.blue, fill: CHART_COLORS.blue },
-    ].filter((d) => d.value > 0);
-
-    const mchPieData = [
-        { name: 'Green (Mothers)', value: reportCharts.mch.green, fill: CHART_COLORS.green },
-        { name: 'Blue (Children)', value: reportCharts.mch.blue, fill: CHART_COLORS.blue },
-    ].filter((d) => d.value > 0);
-
     return (
         <div className="min-w-0">
             <h1 className="text-xl font-semibold text-neutral-900 mb-4 sm:text-2xl sm:mb-6">Dashboard</h1>
             {error && <div className="mb-4 text-red-600 text-sm sm:text-base">{error}</div>}
 
             {loading ? (
-                <div className="text-neutral-500 text-sm sm:text-base">Loading statistics...</div>
+                <div className="text-neutral-500 text-sm sm:text-base">Loading dashboard data...</div>
             ) : (
                 <>
                     <div className="grid grid-cols-1 gap-3 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -209,7 +156,7 @@ const Dashboard = () => {
                                             <dt className="text-sm font-medium text-neutral-500 truncate">MCH Reports</dt>
                                             <dd className="flex items-baseline">
                                                 <div className="text-2xl font-semibold text-neutral-900">
-                                                    {stats?.total_mch_reports ?? countsFromCharts.mchReports ?? 0}
+                                                    {stats?.total_mch_reports ?? chartData.counts.mchReports ?? 0}
                                                 </div>
                                             </dd>
                                         </dl>
@@ -289,7 +236,7 @@ const Dashboard = () => {
                                 <h3 className="text-sm font-medium text-neutral-900 mb-3">
                                     Client Registrations – Green vs Blue
                                 </h3>
-                                {chartsLoading ? (
+                                {loading ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">Loading chart...</p>
                                 ) : clientPieData.length === 0 ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">
@@ -329,7 +276,7 @@ const Dashboard = () => {
                                 <h3 className="text-sm font-medium text-neutral-900 mb-3">
                                     MCH Reports – Green vs Blue
                                 </h3>
-                                {chartsLoading ? (
+                                {loading ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">Loading chart...</p>
                                 ) : mchPieData.length === 0 ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">
@@ -369,9 +316,9 @@ const Dashboard = () => {
                                 <h3 className="text-sm font-medium text-neutral-900 mb-3">
                                     Weekly Plans – By Day of Week
                                 </h3>
-                                {chartsLoading ? (
+                                {loading ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">Loading chart...</p>
-                                ) : reportCharts.plansByDay.every((d) => d.count === 0) ? (
+                                ) : chartData.plansByDay.every((d) => d.count === 0) ? (
                                     <p className="text-xs sm:text-sm text-neutral-500">
                                         No weekly plans data available yet.
                                     </p>
@@ -379,7 +326,7 @@ const Dashboard = () => {
                                     <div className="h-56 sm:h-64 w-full">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart
-                                                data={reportCharts.plansByDay}
+                                                data={chartData.plansByDay}
                                                 layout="vertical"
                                                 margin={{ top: 4, right: 24, left: 48, bottom: 4 }}
                                             >
@@ -397,12 +344,6 @@ const Dashboard = () => {
                                 )}
                             </div>
                         </div>
-
-                        {chartsError && (
-                            <p className="text-xs sm:text-sm text-red-600">
-                                {chartsError}
-                            </p>
-                        )}
                     </div>
                 </>
             )}

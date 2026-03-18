@@ -77,6 +77,15 @@ class ClientRegistration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['created_by', 'created_at']),
+            models.Index(fields=['mentor_mother_name', 'date']),
+            models.Index(fields=['folder_number']),
+            models.Index(fields=['date']),
+            models.Index(fields=['name']),
+        ]
+
     def __str__(self):
         return f"{self.name} - {self.date}"
 
@@ -96,6 +105,13 @@ class ClientFollowUp(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['client', 'created_at']),
+            models.Index(fields=['created_by', 'created_at']),
+            models.Index(fields=['date']),
+        ]
+
     def __str__(self):
         client_name = getattr(self.client, "name", None) or str(self.client_id)
         return f"Follow-up for {client_name} on {self.date}"
@@ -114,6 +130,13 @@ class MCHReport(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['created_by', 'created_at']),
+            models.Index(fields=['mentor_mother_name', 'date']),
+            models.Index(fields=['date']),
+        ]
     
     def __str__(self):
         return f"MCH Report - {self.mentor_mother_name} - {self.date}"
@@ -133,6 +156,14 @@ class WeeklyPlan(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['created_by', 'created_at']),
+            models.Index(fields=['mentor_mother_name', 'date']),
+            models.Index(fields=['date']),
+            models.Index(fields=['day_of_week']),
+        ]
 
     def __str__(self):
         return f"Weekly Plan - {self.mentor_mother_name} - {self.date} - {self.day_of_week}"

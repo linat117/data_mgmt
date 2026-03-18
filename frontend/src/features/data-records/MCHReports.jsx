@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getAllReports, getAllClients, createReport, updateReport, deleteReport, getMentorMothers } from '../../services/recordService';
-import { X, Eye, Pencil, Trash2 } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
+import { X, Eye, Pencil, Trash2, Download } from 'lucide-react';
 import { MCH_CATEGORIES, getInitialMCHMetrics } from './mchFormStructure';
+import * as XLSX from 'xlsx';
 
 const OTHER_MENTOR = '__other__';
 
 const MCHReports = ({ openModalRef }) => {
+    const { user } = useAuthStore();
     const [reports, setReports] = useState([]);
     const [clients, setClients] = useState([]);
     const [mentorMotherNames, setMentorMotherNames] = useState([]);
@@ -14,6 +17,9 @@ const MCHReports = ({ openModalRef }) => {
     const [showModal, setShowModal] = useState(false);
     const [viewReport, setViewReport] = useState(null);
     const [editingReport, setEditingReport] = useState(null);
+    const [editingCell, setEditingCell] = useState(null); // { reportId, field, value }
+    const [showAllColumns, setShowAllColumns] = useState(false);
+    const [mentorFilter, setMentorFilter] = useState('');
     const [formData, setFormData] = useState({
         mentor_mother_name: '',
         date: new Date().toISOString().split('T')[0],
@@ -22,6 +28,141 @@ const MCHReports = ({ openModalRef }) => {
         metrics: getInitialMCHMetrics(),
     });
     const [regionFilter, setRegionFilter] = useState('');
+
+    // Check if user is super admin
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+    // Handle inline editing
+    const handleCellDoubleClick = (reportId, field, currentValue) => {
+        if (!isSuperAdmin) return;
+        setEditingCell({ reportId, field, value: currentValue });
+    };
+
+    const handleCellChange = (e) => {
+        const { value } = e.target;
+        setEditingCell(prev => ({ ...prev, value }));
+    };
+
+    const handleCellBlur = async () => {
+        if (!editingCell) return;
+        
+        const { reportId, field, value } = editingCell;
+        const report = reports.find(r => r.id === reportId);
+        
+        if (!report) return;
+
+        try {
+            let updatedData = { ...report };
+            
+            if (field === 'total_green' || field === 'total_blue') {
+                updatedData[field] = value === '' ? 0 : Number(value);
+            } else if (field.startsWith('metric_')) {
+                const metricKey = field.replace('metric_', '');
+                updatedData.metrics = { ...updatedData.metrics, [metricKey]: value === '' ? 0 : Number(value) };
+            } else if (field.startsWith('remark_')) {
+                const metricKey = field.replace('remark_', '');
+                updatedData.metrics = { ...updatedData.metrics, [`${metricKey}_remark`]: value };
+            }
+
+            await updateReport(reportId, updatedData);
+            
+            // Update local state
+            setReports(prev => prev.map(r => 
+                r.id === reportId ? updatedData : r
+            ));
+            
+            // Update viewReport if it's the same report
+            if (viewReport && viewReport.id === reportId) {
+                setViewReport(updatedData);
+            }
+            
+        } catch (err) {
+            console.error('Failed to update report:', err);
+            alert('Failed to update report. Please try again.');
+        }
+        
+        setEditingCell(null);
+    };
+
+    const handleCellKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            e.target.blur();
+        } else if (e.key === 'Escape') {
+            setEditingCell(null);
+        }
+    };
+
+    // Excel export function
+    const exportToExcel = () => {
+        try {
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Summary sheet
+            const summaryData = filteredReports.map(report => {
+                const relatedClients = clients.filter(
+                    (c) => c.mentor_mother_name === report.mentor_mother_name && c.date === report.date
+                );
+                const firstClient = relatedClients[0] || {};
+                const addedBy = report.created_by_name || report.created_by_email || firstClient.created_by_name || firstClient.created_by_email || '—';
+                
+                return {
+                    'Mentor Mother Name': report.mentor_mother_name,
+                    'Date': report.date,
+                    'Client Name': firstClient.name || '—',
+                    'Age': firstClient.age || '—',
+                    'Sex': firstClient.sex || '—',
+                    'Folder Number': firstClient.folder_number || '—',
+                    'Total Green (Mother)': report.total_green || 0,
+                    'Total Blue (Children)': report.total_blue || 0,
+                    'Added By': addedBy,
+                    'Created At': report.created_at || '—'
+                };
+            });
+            
+            const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+            
+            // Detailed metrics sheet for reports that have metrics
+            const detailedData = [];
+            filteredReports.forEach(report => {
+                if (!report.fromRegistrations && report.metrics) {
+                    MCH_CATEGORIES.forEach(category => {
+                        category.activities.forEach(activity => {
+                            const value = (report.metrics || {})[activity.key] === 0 ? 0 : (report.metrics || {})[activity.key] || '';
+                            const remark = (report.metrics || {})[`${activity.key}_remark`] || '';
+                            
+                            detailedData.push({
+                                'Mentor Mother Name': report.mentor_mother_name,
+                                'Date': report.date,
+                                'Category No': category.no,
+                                'Category Name': category.name,
+                                'Activity': activity.label,
+                                'No. Achieved': value,
+                                'Remark': remark
+                            });
+                        });
+                    });
+                }
+            });
+            
+            if (detailedData.length > 0) {
+                const detailedWs = XLSX.utils.json_to_sheet(detailedData);
+                XLSX.utils.book_append_sheet(wb, detailedWs, 'Detailed Metrics');
+            }
+            
+            // Generate filename with date
+            const today = new Date().toISOString().split('T')[0];
+            const filename = `MCH_Reports_${today}.xlsx`;
+            
+            // Save file
+            XLSX.writeFile(wb, filename);
+            
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            alert('Failed to export to Excel. Please try again.');
+        }
+    };
 
     const fetchReports = async () => {
         setFetchError('');
@@ -81,13 +222,41 @@ const MCHReports = ({ openModalRef }) => {
             setMentorMotherNames(res.data.names || []);
         } catch (err) {
             console.error(err);
+            // Fallback: extract mentor mother names from reports
+            const uniqueMentors = Array.from(
+                new Set(
+                    reports
+                        .map((r) => r.mentor_mother_name)
+                        .filter((name) => name && typeof name === 'string')
+                )
+            );
+            setMentorMotherNames(uniqueMentors);
         }
     };
 
     useEffect(() => {
         fetchReports();
         fetchClients();
+        fetchMentorMothers(); // Fetch mentor mothers on component load
     }, []);
+
+    // Update mentor mother names when reports are loaded
+    useEffect(() => {
+        if (reports.length > 0) {
+            const uniqueMentors = Array.from(
+                new Set(
+                    reports
+                        .map((r) => r.mentor_mother_name)
+                        .filter((name) => name && typeof name === 'string')
+                )
+            );
+            setMentorMotherNames(prev => {
+                // Merge with existing names to avoid duplicates
+                const merged = new Set([...prev, ...uniqueMentors]);
+                return Array.from(merged).sort();
+            });
+        }
+    }, [reports]);
 
     useEffect(() => {
         if (showModal) fetchMentorMothers();
@@ -206,13 +375,31 @@ const MCHReports = ({ openModalRef }) => {
         )
     );
 
-    const filteredReports = regionFilter
-        ? reports.filter((r) => r.created_by_region_code === regionFilter)
-        : reports;
+    const filteredReports = useMemo(() => {
+        let filtered = regionFilter
+            ? reports.filter((r) => r.created_by_region_code === regionFilter)
+            : reports;
+
+        if (mentorFilter) {
+            filtered = filtered.filter((r) => r.mentor_mother_name === mentorFilter);
+        }
+
+        return filtered;
+    }, [reports, regionFilter, mentorFilter]);
 
     return (
         <div className="min-w-0">
-            <h2 className="text-lg font-medium text-neutral-800 sm:text-xl mb-4">Maternal and Child Health Services Report</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium text-neutral-800 sm:text-xl">Maternal and Child Health Services Report</h2>
+                <button
+                    onClick={exportToExcel}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                    disabled={filteredReports.length === 0}
+                >
+                    <Download className="h-4 w-4" />
+                    Export to Excel
+                </button>
+            </div>
 
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
                 {fetchError && (
@@ -225,20 +412,45 @@ const MCHReports = ({ openModalRef }) => {
                 ) : (
                     <div className="overflow-x-auto -mx-3 sm:mx-0" style={{ WebkitOverflowScrolling: 'touch' }}>
                         {regionOptions.length > 0 && (
-                            <div className="px-3 pt-3 pb-2 sm:px-6 flex items-center gap-2 text-sm">
-                                <span className="text-neutral-600 font-medium">Region:</span>
-                                <select
-                                    value={regionFilter}
-                                    onChange={(e) => setRegionFilter(e.target.value)}
-                                    className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white"
+                            <div className="px-3 pt-3 pb-2 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-neutral-600 font-medium">Region:</span>
+                                        <select
+                                            value={regionFilter}
+                                            onChange={(e) => setRegionFilter(e.target.value)}
+                                            className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white"
+                                        >
+                                            <option value="">All</option>
+                                            {regionOptions.map((code) => (
+                                                <option key={code} value={code}>
+                                                    {code}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-neutral-600 font-medium">Mentor Mother:</span>
+                                        <select
+                                            value={mentorFilter}
+                                            onChange={(e) => setMentorFilter(e.target.value)}
+                                            className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white min-w-40"
+                                        >
+                                            <option value="">All</option>
+                                            {mentorMotherNames.map((name) => (
+                                                <option key={name} value={name}>
+                                                    {name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowAllColumns(!showAllColumns)}
+                                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
                                 >
-                                    <option value="">All</option>
-                                    {regionOptions.map((code) => (
-                                        <option key={code} value={code}>
-                                            {code}
-                                        </option>
-                                    ))}
-                                </select>
+                                    {showAllColumns ? 'Show Less' : 'Show All Columns'}
+                                </button>
                             </div>
                         )}
                         <table className="min-w-full divide-y divide-neutral-200">
@@ -248,9 +460,13 @@ const MCHReports = ({ openModalRef }) => {
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Age</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Sex</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Folder</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother’s Name</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
+                                    {showAllColumns && (
+                                        <>
+                                            <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother's Name</th>
+                                            <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
+                                            <th className="px-3 py-2 sm:px-6 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
+                                        </>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
@@ -281,25 +497,29 @@ const MCHReports = ({ openModalRef }) => {
                                             <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
                                                 {firstClient.folder_number || '—'}
                                             </td>
-                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
-                                                {report.mentor_mother_name}
-                                            </td>
-                                            <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4 whitespace-nowrap">
-                                                {addedBy}
-                                            </td>
-                                            <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <button type="button" onClick={() => setViewReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
-                                                    <button type="button" onClick={() => openEditReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Edit" disabled={!!report.fromRegistrations}><Pencil className="h-4 w-4" /></button>
-                                                    <button type="button" onClick={() => handleDeleteReport(report)} className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" disabled={!!report.fromRegistrations}><Trash2 className="h-4 w-4" /></button>
-                                                </div>
-                                            </td>
+                                            {showAllColumns && (
+                                                <>
+                                                    <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
+                                                        {report.mentor_mother_name}
+                                                    </td>
+                                                    <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                        {addedBy}
+                                                    </td>
+                                                    <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <button type="button" onClick={() => setViewReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
+                                                            <button type="button" onClick={() => openEditReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Edit" disabled={!!report.fromRegistrations}><Pencil className="h-4 w-4" /></button>
+                                                            <button type="button" onClick={() => handleDeleteReport(report)} className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" disabled={!!report.fromRegistrations}><Trash2 className="h-4 w-4" /></button>
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            )}
                                         </tr>
                                     );
                                 })}
                                 {reports.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-6">No reports found.</td>
+                                        <td colSpan={showAllColumns ? 7 : 4} className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-6">No reports found.</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -430,11 +650,45 @@ const MCHReports = ({ openModalRef }) => {
                                             <div className="flex flex-wrap gap-4">
                                                 <span>
                                                     <span className="font-semibold">Total case: Green (Mother)</span>{' '}
-                                                    {viewReport.total_green ?? 0}
+                                                    {editingCell?.reportId === viewReport.id && editingCell?.field === 'total_green' ? (
+                                                        <input
+                                                            type="number"
+                                                            value={editingCell.value}
+                                                            onChange={handleCellChange}
+                                                            onBlur={handleCellBlur}
+                                                            onKeyDown={handleCellKeyPress}
+                                                            className="w-16 text-center border border-primary-500 rounded px-1 py-0.5 text-sm ml-2"
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        <span 
+                                                            className={isSuperAdmin ? 'hover:bg-primary-50 px-1 rounded cursor-pointer' : ''}
+                                                            onDoubleClick={() => handleCellDoubleClick(viewReport.id, 'total_green', viewReport.total_green ?? 0)}
+                                                        >
+                                                            {viewReport.total_green ?? 0}
+                                                        </span>
+                                                    )}
                                                 </span>
                                                 <span>
                                                     <span className="font-semibold">Total case: Blue (Children)</span>{' '}
-                                                    {viewReport.total_blue ?? 0}
+                                                    {editingCell?.reportId === viewReport.id && editingCell?.field === 'total_blue' ? (
+                                                        <input
+                                                            type="number"
+                                                            value={editingCell.value}
+                                                            onChange={handleCellChange}
+                                                            onBlur={handleCellBlur}
+                                                            onKeyDown={handleCellKeyPress}
+                                                            className="w-16 text-center border border-primary-500 rounded px-1 py-0.5 text-sm ml-2"
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        <span 
+                                                            className={isSuperAdmin ? 'hover:bg-primary-50 px-1 rounded cursor-pointer' : ''}
+                                                            onDoubleClick={() => handleCellDoubleClick(viewReport.id, 'total_blue', viewReport.total_blue ?? 0)}
+                                                        >
+                                                            {viewReport.total_blue ?? 0}
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </div>
                                             {viewReport.created_by_email && (
@@ -459,6 +713,11 @@ const MCHReports = ({ openModalRef }) => {
                             <div className="px-4 py-4 overflow-y-auto flex-1 space-y-6">
                                 {!viewReport.fromRegistrations && (
                                     <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                                        {isSuperAdmin && (
+                                            <div className="mb-2 p-2 bg-primary-50 border border-primary-200 rounded text-sm text-primary-700">
+                                                💡 <strong>Super Admin:</strong> Double-click on any cell in the table to edit inline. Press Enter to save or Escape to cancel.
+                                            </div>
+                                        )}
                                         <table className="min-w-full border border-neutral-300 text-sm">
                                             <thead className="bg-neutral-50">
                                                 <tr>
@@ -507,11 +766,47 @@ const MCHReports = ({ openModalRef }) => {
                                                                 <td className="border border-neutral-300 px-2 py-1">
                                                                     {act.label}
                                                                 </td>
-                                                                <td className="border border-neutral-300 px-2 py-1 text-center">
-                                                                    {value !== '' ? value : ''}
+                                                                <td 
+                                                                    className="border border-neutral-300 px-2 py-1 text-center"
+                                                                    onDoubleClick={() => handleCellDoubleClick(viewReport.id, `metric_${act.key}`, value)}
+                                                                    style={{ cursor: isSuperAdmin ? 'pointer' : 'default' }}
+                                                                >
+                                                                    {editingCell?.reportId === viewReport.id && editingCell?.field === `metric_${act.key}` ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            value={editingCell.value}
+                                                                            onChange={handleCellChange}
+                                                                            onBlur={handleCellBlur}
+                                                                            onKeyDown={handleCellKeyPress}
+                                                                            className="w-16 text-center border border-primary-500 rounded px-1 py-0.5 text-sm"
+                                                                            autoFocus
+                                                                        />
+                                                                    ) : (
+                                                                        <span className={isSuperAdmin ? 'hover:bg-primary-50 px-1 rounded' : ''}>
+                                                                            {value !== '' ? value : ''}
+                                                                        </span>
+                                                                    )}
                                                                 </td>
-                                                                <td className="border border-neutral-300 px-2 py-1">
-                                                                    {remark}
+                                                                <td 
+                                                                    className="border border-neutral-300 px-2 py-1"
+                                                                    onDoubleClick={() => handleCellDoubleClick(viewReport.id, `remark_${act.key}`, remark)}
+                                                                    style={{ cursor: isSuperAdmin ? 'pointer' : 'default' }}
+                                                                >
+                                                                    {editingCell?.reportId === viewReport.id && editingCell?.field === `remark_${act.key}` ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editingCell.value}
+                                                                            onChange={handleCellChange}
+                                                                            onBlur={handleCellBlur}
+                                                                            onKeyDown={handleCellKeyPress}
+                                                                            className="w-full border border-primary-500 rounded px-1 py-0.5 text-sm"
+                                                                            autoFocus
+                                                                        />
+                                                                    ) : (
+                                                                        <span className={isSuperAdmin ? 'hover:bg-primary-50 px-1 rounded' : ''}>
+                                                                            {remark}
+                                                                        </span>
+                                                                    )}
                                                                 </td>
                                                             </tr>
                                                         );

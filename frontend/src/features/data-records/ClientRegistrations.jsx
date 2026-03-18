@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getAllClients, createClient, updateClient, deleteClient, getMentorMothers, getClientFollowUps, createClientFollowUp, getAllReports, getAllPlans } from '../../services/recordService';
 import { useAuthStore } from '../../store/authStore';
 import { X, Eye, Pencil, Trash2, FileText } from 'lucide-react';
@@ -408,40 +408,67 @@ const ClientRegistrations = ({ openModalRef }) => {
         setEditingClient(null);
     };
 
-    const regionOptions = Array.from(
-        new Set(
-            clients
-                .map((c) => c.created_by_region_code)
-                .filter((code) => code && typeof code === 'string')
-        )
+    // Memoize expensive operations
+    const filteredClients = useMemo(() => {
+        let filtered = regionFilter
+            ? clients.filter((c) => c.created_by_region_code === regionFilter)
+            : clients;
+
+        if (mentorFilter) {
+            filtered = filtered.filter((c) => c.mentor_mother_name === mentorFilter);
+        }
+
+        if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter((c) => {
+                const inName = (c.name || '').toLowerCase().includes(term);
+                const inFolder = (c.folder_number || '').toLowerCase().includes(term);
+                const inAddress = (c.address || '').toLowerCase().includes(term);
+                const inMentor = (c.mentor_mother_name || '').toLowerCase().includes(term);
+                return inName || inFolder || inAddress || inMentor;
+            });
+        }
+        
+        return filtered;
+    }, [clients, regionFilter, mentorFilter, searchTerm]);
+
+    // Memoize options
+    const regionOptions = useMemo(() => 
+        Array.from(
+            new Set(
+                clients
+                    .map((c) => c.created_by_region_code)
+                    .filter((code) => code && typeof code === 'string')
+            )
+        ), [clients]);
+
+    const mentorOptions = useMemo(() =>
+        Array.from(
+            new Set(
+                clients
+                    .map((c) => c.mentor_mother_name)
+                    .filter((name) => name && typeof name === 'string')
+            )
+        ), [clients]);
+
+    // Debounce search to prevent excessive re-renders
+    const debouncedSearch = useCallback(
+        (value) => {
+            setSearchTerm(value);
+        },
+        []
     );
 
-    const mentorOptions = Array.from(
-        new Set(
-            clients
-                .map((c) => c.mentor_mother_name)
-                .filter((name) => name && typeof name === 'string')
-        )
-    );
-
-    let filteredClients = regionFilter
-        ? clients.filter((c) => c.created_by_region_code === regionFilter)
-        : clients;
-
-    if (mentorFilter) {
-        filteredClients = filteredClients.filter((c) => c.mentor_mother_name === mentorFilter);
-    }
-
-    if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase();
-        filteredClients = filteredClients.filter((c) => {
-            const inName = (c.name || '').toLowerCase().includes(term);
-            const inFolder = (c.folder_number || '').toLowerCase().includes(term);
-            const inAddress = (c.address || '').toLowerCase().includes(term);
-            const inMentor = (c.mentor_mother_name || '').toLowerCase().includes(term);
-            return inName || inFolder || inAddress || inMentor;
-        });
-    }
+    const handleSearchChange = useCallback((e) => {
+        const value = e.target.value;
+        // Simple debounce without external library
+        const timeoutId = setTimeout(() => {
+            debouncedSearch(value);
+        }, 300);
+        
+        // Clear previous timeout
+        return () => clearTimeout(timeoutId);
+    }, [debouncedSearch]);
 
     const addPregnancy = () => {
         setPregnancies((prev) => [...prev, { ...pregnancyDefaults }]);
@@ -723,8 +750,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                             <div className="mt-2 sm:mt-0">
                                 <input
                                     type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={handleSearchChange}
                                     placeholder="Search by client, folder, mentor, address..."
                                     className="w-full sm:w-64 border border-neutral-300 rounded-md py-1.5 px-3 text-sm"
                                 />

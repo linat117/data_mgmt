@@ -48,7 +48,7 @@ class BaseMCHViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = records_queryset_for_user(self.queryset.model, self.request.user)
-        return qs.order_by("-created_at").select_related("created_by")
+        return qs.order_by("-created_at").select_related("created_by", "created_by__region")
 
     def perform_create(self, serializer):
         instance = serializer.save(created_by=self.request.user)
@@ -69,8 +69,8 @@ class ClientRegistrationViewSet(BaseMCHViewSet):
 
     def get_queryset(self):
         qs = records_queryset_for_user(self.queryset.model, self.request.user)
-        return qs.order_by("-created_at").select_related("created_by").prefetch_related(
-            "followups__created_by"
+        return qs.order_by("-created_at").select_related("created_by", "created_by__region").prefetch_related(
+            "followups__created_by", "followups__created_by__region"
         )
 
     def perform_create(self, serializer):
@@ -94,40 +94,36 @@ class ClientRegistrationViewSet(BaseMCHViewSet):
             region = getattr(user.pm, "region", None)
 
         region_code = getattr(region, "code", None) or "GEN"
-
         prefix = f"{region_code}_"
-        existing_numbers = set()
 
-        # All users that belong to this region, either directly or via PM.
+        # Use a simpler approach - get existing folder numbers and process in Python
         if region is not None:
             user_ids = list(
                 User.objects.filter(models.Q(region=region) | models.Q(pm__region=region)).values_list(
                     "id", flat=True
                 )
             )
-            qs = ClientRegistration.objects.filter(created_by_id__in=user_ids).values_list(
-                "folder_number", flat=True
-            )
+            existing_numbers = ClientRegistration.objects.filter(
+                created_by_id__in=user_ids,
+                folder_number__startswith=prefix
+            ).values_list('folder_number', flat=True)
         else:
-            qs = ClientRegistration.objects.filter(folder_number__startswith=prefix).values_list(
-                "folder_number", flat=True
-            )
-        for fn in qs:
-            if not fn or not isinstance(fn, str):
-                continue
-            if not fn.startswith(prefix):
-                continue
-            try:
-                num_part = int(fn.split("_")[-1])
-                existing_numbers.add(num_part)
-            except (ValueError, TypeError):
-                continue
+            existing_numbers = ClientRegistration.objects.filter(
+                folder_number__startswith=prefix
+            ).values_list('folder_number', flat=True)
 
-        next_num = 1
-        while next_num in existing_numbers:
-            next_num += 1
+        # Extract numeric parts and find max
+        max_num = 0
+        for fn in existing_numbers:
+            if fn and fn.startswith(prefix):
+                try:
+                    num_part = int(fn.split('_')[-1])
+                    if num_part > max_num:
+                        max_num = num_part
+                except (ValueError, TypeError):
+                    continue
 
-        instance.folder_number = f"{prefix}{next_num:03d}"
+        instance.folder_number = f"{prefix}{max_num + 1:03d}"
         instance.save(update_fields=["folder_number"])
         log_audit_action(self.request.user, "CREATE", instance, self.request)
 
@@ -162,7 +158,7 @@ class ClientFollowUpViewSet(BaseMCHViewSet):
                 # For other roles, only filter within their accessible records
                 qs = qs.filter(created_by_id=created_by)
         
-        return qs.order_by("-created_at").select_related("created_by", "client")
+        return qs.order_by("-created_at").select_related("created_by", "created_by__region", "client", "client__created_by", "client__created_by__region")
 
 
 def mentor_mother_names_queryset(request):

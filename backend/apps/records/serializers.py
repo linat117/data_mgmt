@@ -62,30 +62,18 @@ class ClientRegistrationSerializer(serializers.ModelSerializer):
         qs = getattr(obj, "followups", None)
         if qs is None:
             return 0
-        return qs.count()
+        return len(qs.all())  # Use len() instead of count() since we have prefetched data
 
     def get_followup_created_by(self, obj):
         qs = getattr(obj, "followups", None)
         if qs is None:
             return []
         names = []
-        for fu in qs.all():
+        for fu in qs.all():  # Now uses prefetched data, no additional queries
             name = get_created_by_name(fu) or get_created_by_email(fu)
             if name and name not in names:
                 names.append(name)
         return names
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["created_by_email"] = self.get_created_by_email(instance)
-        data["created_by_name"] = self.get_created_by_name(instance)
-        rid, rname, rcode = get_created_by_region_fields(instance)
-        data["created_by_region_id"] = rid
-        data["created_by_region_name"] = rname
-        data["created_by_region_code"] = rcode
-        data["followup_count"] = self.get_followup_count(instance)
-        data["followup_created_by"] = self.get_followup_created_by(instance)
-        return data
 
 
 class ClientFollowUpSerializer(serializers.ModelSerializer):
@@ -134,16 +122,6 @@ class MCHReportSerializer(serializers.ModelSerializer):
         _, _, code = get_created_by_region_fields(obj)
         return code
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["created_by_email"] = self.get_created_by_email(instance)
-        data["created_by_name"] = self.get_created_by_name(instance)
-        rid, rname, rcode = get_created_by_region_fields(instance)
-        data["created_by_region_id"] = rid
-        data["created_by_region_name"] = rname
-        data["created_by_region_code"] = rcode
-        return data
-
 
 class WeeklyPlanSerializer(serializers.ModelSerializer):
     created_by_email = serializers.SerializerMethodField(read_only=True)
@@ -174,13 +152,3 @@ class WeeklyPlanSerializer(serializers.ModelSerializer):
     def get_created_by_region_code(self, obj):
         _, _, code = get_created_by_region_fields(obj)
         return code
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["created_by_email"] = self.get_created_by_email(instance)
-        data["created_by_name"] = self.get_created_by_name(instance)
-        rid, rname, rcode = get_created_by_region_fields(instance)
-        data["created_by_region_id"] = rid
-        data["created_by_region_name"] = rname
-        data["created_by_region_code"] = rcode
-        return data
