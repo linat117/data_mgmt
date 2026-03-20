@@ -221,3 +221,11 @@ _CORS_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _CORS_ORIGINS.split(',') if o.strip()]
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
+# settings.py
+CORS_ALLOWED_HEADERS = [
+    'content-type',
+    'authorization',
+    'x-neon-auth',  # Add this line
+]
+
+# CORS_ALLOW_ALL_ORIGINS is already set to True above when DEBUG is True
