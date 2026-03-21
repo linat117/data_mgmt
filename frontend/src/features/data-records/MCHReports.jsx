@@ -105,19 +105,11 @@ const MCHReports = ({ openModalRef }) => {
             
             // Summary sheet - all filtered reports
             const summaryData = filteredReports.map(report => {
-                const relatedClients = clients.filter(
-                    (c) => c.mentor_mother_name === report.mentor_mother_name && c.date === report.date
-                );
-                const firstClient = relatedClients[0] || {};
-                const addedBy = report.created_by_name || report.created_by_email || firstClient.created_by_name || firstClient.created_by_email || '—';
+                const addedBy = report.created_by_name || report.created_by_email || '—';
                 
                 return {
-                    'Mentor Mother Name': report.mentor_mother_name,
-                    'Date': report.date,
-                    'Client Name': firstClient.name || '—',
-                    'Age': firstClient.age || '—',
-                    'Sex': firstClient.sex || '—',
-                    'Folder Number': firstClient.folder_number || '—',
+                    'Mentor Mother Name': report.mentor_mother_name || '—',
+                    'Date': report.date || '—',
                     'Total Green (Mother)': report.total_green || 0,
                     'Total Blue (Children)': report.total_blue || 0,
                     'Added By': addedBy,
@@ -256,19 +248,11 @@ const MCHReports = ({ openModalRef }) => {
             
             // Summary sheet - all reports for this mentor mother
             const summaryData = mentorReports.map(report => {
-                const relatedClients = clients.filter(
-                    (c) => c.mentor_mother_name === report.mentor_mother_name && c.date === report.date
-                );
-                const firstClient = relatedClients[0] || {};
-                const addedBy = report.created_by_name || report.created_by_email || firstClient.created_by_name || firstClient.created_by_email || '—';
+                const addedBy = report.created_by_name || report.created_by_email || '—';
                 
                 return {
-                    'Mentor Mother Name': report.mentor_mother_name,
-                    'Date': report.date,
-                    'Client Name': firstClient.name || '—',
-                    'Age': firstClient.age || '—',
-                    'Sex': firstClient.sex || '—',
-                    'Folder Number': firstClient.folder_number || '—',
+                    'Mentor Mother Name': report.mentor_mother_name || '—',
+                    'Date': report.date || '—',
                     'Total Green (Mother)': report.total_green || 0,
                     'Total Blue (Children)': report.total_blue || 0,
                     'Added By': addedBy,
@@ -734,13 +718,12 @@ const MCHReports = ({ openModalRef }) => {
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50">
                                 <tr>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client Name</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Age</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Sex</th>
-                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Folder</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Green Cases</th>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Blue Cases</th>
                                     {showAllColumns && (
                                         <>
-                                            <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother's Name</th>
                                             <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
                                             <th className="px-3 py-2 sm:px-6 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
                                         </>
@@ -749,86 +732,53 @@ const MCHReports = ({ openModalRef }) => {
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
                                 {paginatedReports.map((report) => {
-                                    const relatedClients = clients.filter(
-                                        (c) =>
-                                            c.mentor_mother_name === report.mentor_mother_name &&
-                                            c.date === report.date
-                                    );
-                                    const firstClient = relatedClients[0] || {};
-                                    const addedBy =
-                                        report.created_by_name ||
-                                        report.created_by_email ||
-                                        firstClient.created_by_name ||
-                                        firstClient.created_by_email ||
-                                        '—';
+                                    const addedBy = report.created_by_name || report.created_by_email || '—';
                                     return (
                                         <tr key={report.id} className="hover:bg-neutral-50">
                                             <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">
-                                                {firstClient.name || '—'}
+                                                {report.mentor_mother_name || '—'}
                                             </td>
                                             <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
-                                                {firstClient.age ?? '—'}
+                                                {report.date || '—'}
                                             </td>
                                             <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
-                                                {firstClient.sex || '—'}
+                                                {report.total_green || 0}
                                             </td>
                                             <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
-                                                {firstClient.folder_number || '—'}
+                                                {report.total_blue || 0}
                                             </td>
                                             {showAllColumns && (
                                                 <>
-                                                    <td 
-                                                        className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4"
-                                                        onDoubleClick={() => handleCellDoubleClick(report.id, 'mentor_mother_name', report.mentor_mother_name)}
-                                                        style={{ cursor: isSuperAdmin ? 'pointer' : 'default' }}
-                                                    >
-                                                        {editingCell?.reportId === report.id && editingCell?.field === 'mentor_mother_name' ? (
-                                                            <input
-                                                                type="text"
-                                                                value={editingCell.value}
-                                                                onChange={handleCellChange}
-                                                                onBlur={handleCellBlur}
-                                                                onKeyDown={handleCellKeyPress}
-                                                                className="w-full border border-primary-500 rounded px-1 py-0.5 text-sm"
-                                                                autoFocus
-                                                            />
-                                                        ) : (
-                                                            <span className={isSuperAdmin ? 'hover:bg-primary-50 px-1 rounded' : ''}>
-                                                                {report.mentor_mother_name}
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                    <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
                                                         {addedBy}
                                                     </td>
-                                                    <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <button 
-                                                                type="button" 
-                                                                onClick={() => setViewReport(report)} 
-                                                                className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" 
-                                                                title="View detailed report" 
+                                                    <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium sm:px-6 sm:py-4">
+                                                        <div className="flex justify-end space-x-2">
+                                                            <button
+                                                                onClick={() => setViewReport(report)}
+                                                                className="text-primary-600 hover:text-primary-900"
+                                                                title="View details"
                                                             >
                                                                 <Eye className="h-4 w-4" />
                                                             </button>
-                                                            <button 
-                                                                type="button" 
-                                                                onClick={() => openEditReport(report)} 
-                                                                className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" 
-                                                                title="Edit report" 
-                                                                disabled={!!report.fromRegistrations}
-                                                            >
-                                                                <Pencil className="h-4 w-4" />
-                                                            </button>
-                                                            <button 
-                                                                type="button" 
-                                                                onClick={() => handleDeleteReport(report)} 
-                                                                className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" 
-                                                                title="Delete report" 
-                                                                disabled={!!report.fromRegistrations}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
+                                                            {isSuperAdmin && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleEdit(report)}
+                                                                        className="text-indigo-600 hover:text-indigo-900"
+                                                                        title="Edit report"
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDelete(report.id)}
+                                                                        className="text-red-600 hover:text-red-900"
+                                                                        title="Delete report"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </>
@@ -836,9 +786,9 @@ const MCHReports = ({ openModalRef }) => {
                                         </tr>
                                     );
                                 })}
-                                {reports.length === 0 && (
+                                {paginatedReports.length === 0 && (
                                     <tr>
-                                        <td colSpan={showAllColumns ? 7 : 4} className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-6">No reports found.</td>
+                                        <td colSpan={showAllColumns ? 6 : 4} className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-6">No reports found.</td>
                                     </tr>
                                 )}
                             </tbody>
