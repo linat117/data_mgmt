@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ethiopian Data Management</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+        .flag {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .button:active {
+            transform: translateY(0);
+        }
+        .warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #92400e;
+        }
+        .info {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #1e40af;
+        }
+        .code {
+            background: #f3f4f6;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .data-preview {
+            background: #f8fafc4;
+            border: 1px solid #84cc16;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="flag">🇪🇹</div>
+            <h1>Ethiopian Data Management</h1>
+            <p>Clear dummy data and create realistic Ethiopian client registrations and users</p>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This will delete ALL existing client registrations and users (except main admin). Make sure you want to proceed!
+        </div>
+
+        <div class="info">
+            <strong>📋 What will be created:</strong>
+            <ul>
+                <li><strong>5 Client Registrations</strong> with Ethiopian names and realistic data</li>
+                <li><strong>5 Users:</strong> 1 Super Admin, 2 Project Managers, 2 Mentor Mothers</li>
+                <li><strong>Ethiopian Regions:</strong> Addis Ababa, Oromia, Amhara, Tigray, Southern Nations</li>
+                <li><strong>Realistic Data:</strong> Proper phone numbers, addresses, ages, weights, etc.</li>
+            </ul>
+        </div>
+
+        <div class="data-preview">
+            <strong>👥 Sample Ethiopian Names:</strong>
+            <div class="code">
+                First Names: Abeba, Almaz, Bethlehem, Dawit, Eleni, Fikir, Genet, Hanna, Kidan, Lemma, Makeda, Nahom, Rahel, Saron, Tigist<br>
+                Last Names: Abebe, Bekele, Demissie, Girma, Haile, Kassa, Lemma, Mekonnen, Negash, Tesfaye, Woldemariam
+            </div>
+        </div>
+
+        <button class="button" onclick="executeDataReset()">
+            🚀 Reset & Create Ethiopian Data
+        </button>
+
+        <button class="button" onclick="window.location.href='/dashboard'" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-top: 30px;">
+            📊 Go to Dashboard
+        </button>
+
+        <div class="info">
+            <strong>🔧 How to use:</strong>
+            <ol>
+                <li>Click the button above to clear existing data and create new Ethiopian data</li>
+                <li>Wait for the process to complete (check browser console)</li>
+                <li>Refresh the page to see new data</li>
+                <li>Navigate to Client Registrations and Users pages to verify</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Load the standalone data management script
+        async function loadScript() {
+            try {
+                const response = await fetch('/ethiopian-data-standalone.js');
+                const script = await response.text();
+                eval(script);
+                return true;
+            } catch (error) {
+                console.error('Failed to load script:', error);
+                alert('Failed to load data management script. Please check console.');
+                return false;
+            }
+        }
+
+        async function executeDataReset() {
+            if (!confirm('Are you sure you want to delete all existing data and create new Ethiopian test data? This action cannot be undone.')) {
+                return;
+            }
+
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = '⏳ Processing...';
+
+            try {
+                const loaded = await loadScript();
+                if (loaded && typeof resetAndCreateEthiopianData === 'function') {
+                    await resetAndCreateEthiopianData();
+                    button.textContent = '✅ Completed! Refresh the page to see new data.';
+                    setTimeout(() => {
+                        button.textContent = '🚀 Reset & Create Ethiopian Data';
+                        button.disabled = false;
+                    }, 5000);
+                } else {
+                    throw new Error('Data management function not loaded');
+                }
+            } catch (error) {
+                console.error('Error during data reset:', error);
+                alert('Error during data reset. Please check browser console for details.');
+                button.textContent = '❌ Error Occurred';
+                setTimeout(() => {
+                    button.textContent = '🚀 Reset & Create Ethiopian Data';
+                    button.disabled = false;
+                }, 3000);
+            }
+        }
+
+        // Auto-execute if function is available
+        window.addEventListener('load', () => {
+            console.log('🇪🇹 Ethiopian Data Management page loaded');
+            console.log('Ready to reset and create Ethiopian test data');
+        });
+    </script>
+</body>
+</html>

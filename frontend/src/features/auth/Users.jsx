@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     getUsers,
@@ -11,6 +11,7 @@ import {
 } from '../../services/userService';
 import { useAuthStore } from '../../store/authStore';
 import { Plus, X, UserCircle, Pencil, UserX, UserCheck, Trash2, MapPin } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
 
 const ROLE_LABELS = { SUPER_ADMIN: 'Super Admin', PM: 'Project Manager', MENTOR_MOTHER: 'Mentor Mother' };
 
@@ -37,6 +38,8 @@ const Users = () => {
     const [showRegionModal, setShowRegionModal] = useState(false);
     const [regionForm, setRegionForm] = useState({ name: '', code: '' });
     const [formData, setFormData] = useState(defaultUserForm);
+    const [showSuperAdminConfirm, setShowSuperAdminConfirm] = useState(false);
+    const [pendingSuperAdminData, setPendingSuperAdminData] = useState(null);
     const [editFormData, setEditFormData] = useState({
         email: '',
         first_name: '',
@@ -54,6 +57,8 @@ const Users = () => {
     const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
     const isPM = currentUser?.role === 'PM';
     const [roleFilter, setRoleFilter] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     const fetchUsers = async () => {
         try {
@@ -146,6 +151,14 @@ const Users = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Check if creating a super admin and show confirmation
+        if (formData.role === 'SUPER_ADMIN') {
+            setPendingSuperAdminData(buildCreatePayload());
+            setShowSuperAdminConfirm(true);
+            return;
+        }
+        
         try {
             await createUser(buildCreatePayload());
             setShowModal(false);
@@ -155,6 +168,27 @@ const Users = () => {
             console.error('Error creating user', err);
             alert(JSON.stringify(err.response?.data) || 'Failed to create user');
         }
+    };
+    
+    const confirmSuperAdminCreation = async () => {
+        if (!pendingSuperAdminData) return;
+        
+        try {
+            await createUser(pendingSuperAdminData);
+            setShowSuperAdminConfirm(false);
+            setPendingSuperAdminData(null);
+            setShowModal(false);
+            setFormData(defaultUserForm);
+            fetchUsers();
+        } catch (err) {
+            console.error('Error creating super admin', err);
+            alert(JSON.stringify(err.response?.data) || 'Failed to create super admin');
+        }
+    };
+    
+    const cancelSuperAdminCreation = () => {
+        setShowSuperAdminConfirm(false);
+        setPendingSuperAdminData(null);
     };
 
     const pmOptions = users.filter((u) => u.role === 'PM');
@@ -210,12 +244,19 @@ const Users = () => {
     };
 
     const handleDeleteConfirm = async () => {
-        if (!deleteTarget) return;
+        console.log('Delete confirm called, deleteTarget:', deleteTarget);
+        if (!deleteTarget) {
+            console.log('No delete target, returning');
+            return;
+        }
         try {
+            console.log('Attempting to delete user:', deleteTarget.id);
             await deleteUser(deleteTarget.id);
+            console.log('Delete successful');
             setDeleteTarget(null);
             fetchUsers();
         } catch (err) {
+            console.error('Error deleting user:', err);
             alert(err.response?.data?.detail || 'Failed to delete user.');
         }
     };
@@ -238,8 +279,28 @@ const Users = () => {
         ? users.filter((u) => u.role === roleFilter)
         : users;
 
+    // Pagination
+    const paginatedUsers = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredUsers.slice(startIndex, endIndex);
+    }, [filteredUsers, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [roleFilter]);
+
     const createRoleOptions = () => {
-        if (isSuperAdmin) return [<option key="PM" value="PM">Project Manager</option>, <option key="MENTOR_MOTHER" value="MENTOR_MOTHER">Mentor Mother</option>];
+        if (isSuperAdmin) {
+            return [
+                <option key="SUPER_ADMIN" value="SUPER_ADMIN">Super Admin</option>,
+                <option key="PM" value="PM">Project Manager</option>,
+                <option key="MENTOR_MOTHER" value="MENTOR_MOTHER">Mentor Mother</option>
+            ];
+        }
         return [<option key="MENTOR_MOTHER" value="MENTOR_MOTHER">Mentor Mother</option>];
     };
 
@@ -314,7 +375,7 @@ const Users = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {filteredUsers.map((u) => (
+                                {paginatedUsers.map((u) => (
                                     <tr key={u.id} className={`hover:bg-neutral-50 ${u.is_active === false ? 'bg-neutral-50 opacity-75' : ''}`}>
                                         <td className="px-3 py-3 whitespace-nowrap sm:px-6 sm:py-4">
                                             <div className="flex items-center min-w-0">
@@ -637,7 +698,14 @@ const Users = () => {
                                 <button type="button" onClick={() => setDeleteTarget(null)} className="px-4 py-2 border border-neutral-300 rounded-md text-sm font-medium text-neutral-700 hover:bg-neutral-50">
                                     Cancel
                                 </button>
-                                <button type="button" onClick={handleDeleteConfirm} className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700">
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        console.log('Delete button clicked');
+                                        handleDeleteConfirm();
+                                    }} 
+                                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700"
+                                >
                                     Delete
                                 </button>
                             </div>
@@ -645,6 +713,66 @@ const Users = () => {
                     </div>
                 </div>
             )}
+
+            {showSuperAdminConfirm && (
+                <div className="fixed z-10 inset-0 overflow-y-auto p-4">
+                    <div className="flex min-h-full items-center justify-center">
+                        <div className="fixed inset-0 bg-neutral-500 opacity-75" onClick={cancelSuperAdminCreation} />
+                        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="flex-shrink-0">
+                                    <UserCircle className="h-8 w-8 text-purple-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-medium text-neutral-900">Create Super Admin</h3>
+                                    <p className="text-sm text-neutral-600">Confirm this sensitive action</p>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-purple-50 border border-purple-200 rounded-md p-4 mb-4">
+                                <p className="text-sm text-purple-800 font-medium mb-2">⚠️ Important Security Notice</p>
+                                <ul className="text-sm text-purple-700 space-y-1">
+                                    <li>• Super Admins have full system access</li>
+                                    <li>• They can manage all users and data</li>
+                                    <li>• This action cannot be easily reversed</li>
+                                    <li>• Only create for trusted personnel</li>
+                                </ul>
+                            </div>
+                            
+                            <div className="bg-neutral-50 rounded-md p-3 mb-4">
+                                <p className="text-sm text-neutral-600">
+                                    Are you sure you want to create <strong>{formData.first_name} {formData.last_name}</strong> ({formData.email}) as a Super Admin?
+                                </p>
+                            </div>
+                            
+                            <div className="flex justify-end gap-2">
+                                <button 
+                                    type="button" 
+                                    onClick={cancelSuperAdminCreation} 
+                                    className="px-4 py-2 border border-neutral-300 rounded-md text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={confirmSuperAdminCreation} 
+                                    className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700"
+                                >
+                                    Create Super Admin
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={filteredUsers.length}
+                onItemsPerPageChange={setItemsPerPage}
+            />
         </div>
     );
 };

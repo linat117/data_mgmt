@@ -1,7 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from .models import Region, FeaturePermission
+from .validators import validate_phone_number, validate_role_assignment
 
 User = get_user_model()
 
@@ -50,6 +52,11 @@ class UserSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "date_joined"]
 
+    def validate_phone_number(self, value):
+        """Validate phone number format."""
+        validate_phone_number(value)
+        return value
+
     def get_permission_codes(self, obj):
         return list(obj.feature_permissions.values_list("code", flat=True))
 
@@ -83,6 +90,18 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "feature_permissions",
         ]
         extra_kwargs = {"password": {"write_only": True, "required": False}}
+
+    def validate_phone_number(self, value):
+        """Validate phone number format."""
+        validate_phone_number(value)
+        return value
+
+    def validate_role(self, value):
+        """Validate role assignment based on current user."""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validate_role_assignment(request.user, value)
+        return value
 
     def create(self, validated_data):
         permissions = validated_data.pop("feature_permissions", [])

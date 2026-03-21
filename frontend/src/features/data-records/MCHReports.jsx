@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getAllReports, getAllClients, createReport, updateReport, deleteReport, getMentorMothers } from '../../services/recordService';
 import { useAuthStore } from '../../store/authStore';
-import { X, Eye, Pencil, Trash2, Download } from 'lucide-react';
+import { X, Eye, Pencil, Trash2, Download, FileText } from 'lucide-react';
 import { MCH_CATEGORIES, getInitialMCHMetrics } from './mchFormStructure';
+import Pagination from '../../components/common/Pagination';
 import * as XLSX from 'xlsx';
 
 const OTHER_MENTOR = '__other__';
@@ -28,6 +29,8 @@ const MCHReports = ({ openModalRef }) => {
         metrics: getInitialMCHMetrics(),
     });
     const [regionFilter, setRegionFilter] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     // Check if user is super admin
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -56,6 +59,8 @@ const MCHReports = ({ openModalRef }) => {
             
             if (field === 'total_green' || field === 'total_blue') {
                 updatedData[field] = value === '' ? 0 : Number(value);
+            } else if (field === 'mentor_mother_name') {
+                updatedData[field] = value;
             } else if (field.startsWith('metric_')) {
                 const metricKey = field.replace('metric_', '');
                 updatedData.metrics = { ...updatedData.metrics, [metricKey]: value === '' ? 0 : Number(value) };
@@ -98,8 +103,159 @@ const MCHReports = ({ openModalRef }) => {
             // Create workbook
             const wb = XLSX.utils.book_new();
             
-            // Summary sheet
+            // Summary sheet - all filtered reports
             const summaryData = filteredReports.map(report => {
+                const relatedClients = clients.filter(
+                    (c) => c.mentor_mother_name === report.mentor_mother_name && c.date === report.date
+                );
+                const firstClient = relatedClients[0] || {};
+                const addedBy = report.created_by_name || report.created_by_email || firstClient.created_by_name || firstClient.created_by_email || '—';
+                
+                return {
+                    'Mentor Mother Name': report.mentor_mother_name,
+                    'Date': report.date,
+                    'Client Name': firstClient.name || '—',
+                    'Age': firstClient.age || '—',
+                    'Sex': firstClient.sex || '—',
+                    'Folder Number': firstClient.folder_number || '—',
+                    'Total Green (Mother)': report.total_green || 0,
+                    'Total Blue (Children)': report.total_blue || 0,
+                    'Added By': addedBy,
+                    'Created At': report.created_at || '—',
+                    'Region': report.created_by_region_code || '—'
+                };
+            });
+            
+            const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'Filtered Reports Summary');
+            
+            // Detailed metrics sheet for all filtered reports with metrics
+            const detailedData = [];
+            filteredReports.forEach(report => {
+                if (!report.fromRegistrations && report.metrics) {
+                    MCH_CATEGORIES.forEach(category => {
+                        category.activities.forEach(activity => {
+                            const value = (report.metrics || {})[activity.key] === 0 ? 0 : (report.metrics || {})[activity.key] || '';
+                            const remark = (report.metrics || {})[`${activity.key}_remark`] || '';
+                            
+                            detailedData.push({
+                                'Mentor Mother Name': report.mentor_mother_name,
+                                'Date': report.date,
+                                'Report ID': report.id,
+                                'Category No': category.no,
+                                'Category Name': category.name,
+                                'Activity': activity.label,
+                                'No. Achieved': value,
+                                'Remark': remark,
+                                'Region': report.created_by_region_code || '—'
+                            });
+                        });
+                    });
+                }
+            });
+            
+            if (detailedData.length > 0) {
+                const detailedWs = XLSX.utils.json_to_sheet(detailedData);
+                XLSX.utils.book_append_sheet(wb, detailedWs, 'Service Metrics');
+            }
+            
+            // All related clients sheet - clients for all filtered reports
+            const filteredClients = [];
+            filteredReports.forEach(report => {
+                const reportClients = clients.filter(
+                    (c) => c.mentor_mother_name === report.mentor_mother_name && c.date === report.date
+                );
+                reportClients.forEach(client => {
+                    if (!filteredClients.find(c => c.id === client.id)) {
+                        filteredClients.push({
+                            ...client,
+                            'Report Date': report.date,
+                            'Report ID': report.id
+                        });
+                    }
+                });
+            });
+            
+            if (filteredClients.length > 0) {
+                const clientData = filteredClients.map(client => ({
+                    'Report ID': client['Report ID'],
+                    'Report Date': client['Report Date'],
+                    'Mentor Mother Name': client.mentor_mother_name,
+                    'Client Name': client.name,
+                    'Age': client.age,
+                    'Sex': client.sex,
+                    'Folder Number': client.folder_number,
+                    'Address': client.address,
+                    'Weight': client.weight || '—',
+                    'MUAC': client.muac || '—',
+                    'Total Green Cases': client.total_green_cases || 0,
+                    'Total Blue Cases': client.total_blue_cases || 0,
+                    'Identified Problem': client.identified_problem,
+                    'Counseling Given': client.counseling_given,
+                    'Demonstration Shown': client.demonstration_shown,
+                    'Anything Additional': client.anything_additional,
+                    'Problem Faced by MM': client.problem_faced_by_mm,
+                    'Added By': client.created_by_name || client.created_by_email || '—',
+                    'Created At': client.created_at,
+                    'Region': client.created_by_region_code || '—'
+                }));
+                
+                const clientWs = XLSX.utils.json_to_sheet(clientData);
+                XLSX.utils.book_append_sheet(wb, clientWs, 'All Related Clients');
+            }
+            
+            // Summary statistics sheet
+            const statsData = [
+                { 'Metric': 'Total Reports Exported', 'Count': filteredReports.length },
+                { 'Metric': 'Total Clients Exported', 'Count': filteredClients.length },
+                { 'Metric': 'Total Green Cases (Mothers)', 'Count': filteredReports.reduce((sum, r) => sum + (r.total_green || 0), 0) },
+                { 'Metric': 'Total Blue Cases (Children)', 'Count': filteredReports.reduce((sum, r) => sum + (r.total_blue || 0), 0) },
+                { 'Metric': 'Export Date', 'Count': new Date().toISOString().split('T')[0] },
+                { 'Metric': 'Applied Filters', 'Count': `Region: ${regionFilter || 'All'}, Mentor: ${mentorFilter || 'All'}` }
+            ];
+            
+            const statsWs = XLSX.utils.json_to_sheet(statsData);
+            XLSX.utils.book_append_sheet(wb, statsWs, 'Export Statistics');
+            
+            // Generate filename with date and filters
+            const today = new Date().toISOString().split('T')[0];
+            const filterInfo = [];
+            if (regionFilter) filterInfo.push(regionFilter);
+            if (mentorFilter) filterInfo.push(mentorFilter.replace(/[^a-zA-Z0-9]/g, '_'));
+            const filterSuffix = filterInfo.length > 0 ? `_${filterInfo.join('_')}` : '';
+            const filename = `MCH_Reports_Filtered_${today}${filterSuffix}.xlsx`;
+            
+            // Save file
+            XLSX.writeFile(wb, filename);
+            
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            alert('Failed to export to Excel. Please try again.');
+        }
+    };
+
+    // Export single report function
+    const exportSingleReport = () => {
+        if (!viewReport) {
+            console.log('No viewReport found');
+            return;
+        }
+        
+        console.log('Exporting single report with history:', viewReport);
+        
+        try {
+            // Get all reports for this mentor mother (not just current one)
+            const mentorReports = reports.filter(
+                (r) => r.mentor_mother_name === viewReport.mentor_mother_name
+            );
+            
+            console.log('Found mentor reports:', mentorReports.length);
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Summary sheet - all reports for this mentor mother
+            const summaryData = mentorReports.map(report => {
                 const relatedClients = clients.filter(
                     (c) => c.mentor_mother_name === report.mentor_mother_name && c.date === report.date
                 );
@@ -121,11 +277,11 @@ const MCHReports = ({ openModalRef }) => {
             });
             
             const summaryWs = XLSX.utils.json_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'All Reports Summary');
             
-            // Detailed metrics sheet for reports that have metrics
+            // Detailed metrics sheet for all reports with metrics
             const detailedData = [];
-            filteredReports.forEach(report => {
+            mentorReports.forEach(report => {
                 if (!report.fromRegistrations && report.metrics) {
                     MCH_CATEGORIES.forEach(category => {
                         category.activities.forEach(activity => {
@@ -148,19 +304,55 @@ const MCHReports = ({ openModalRef }) => {
             
             if (detailedData.length > 0) {
                 const detailedWs = XLSX.utils.json_to_sheet(detailedData);
-                XLSX.utils.book_append_sheet(wb, detailedWs, 'Detailed Metrics');
+                XLSX.utils.book_append_sheet(wb, detailedWs, 'All Service Metrics');
             }
             
-            // Generate filename with date
+            // Related clients sheet - all clients for this mentor mother
+            const mentorClients = clients.filter(
+                (c) => c.mentor_mother_name === viewReport.mentor_mother_name
+            );
+            
+            if (mentorClients.length > 0) {
+                const clientData = mentorClients.map(client => ({
+                    'Mentor Mother Name': client.mentor_mother_name,
+                    'Date': client.date,
+                    'Client Name': client.name,
+                    'Age': client.age,
+                    'Sex': client.sex,
+                    'Folder Number': client.folder_number,
+                    'Address': client.address,
+                    'Weight': client.weight || '—',
+                    'MUAC': client.muac || '—',
+                    'Total Green Cases': client.total_green_cases || 0,
+                    'Total Blue Cases': client.total_blue_cases || 0,
+                    'Identified Problem': client.identified_problem,
+                    'Counseling Given': client.counseling_given,
+                    'Demonstration Shown': client.demonstration_shown,
+                    'Anything Additional': client.anything_additional,
+                    'Problem Faced by MM': client.problem_faced_by_mm,
+                    'Added By': client.created_by_name || client.created_by_email || '—',
+                    'Created At': client.created_at
+                }));
+                
+                const clientWs = XLSX.utils.json_to_sheet(clientData);
+                XLSX.utils.book_append_sheet(wb, clientWs, 'All Related Clients');
+            }
+            
+            // Generate filename
+            const mentorName = viewReport.mentor_mother_name.replace(/[^a-zA-Z0-9]/g, '_');
             const today = new Date().toISOString().split('T')[0];
-            const filename = `MCH_Reports_${today}.xlsx`;
+            const filename = `MCH_History_${mentorName}_${today}.xlsx`;
+            
+            console.log('Generated filename:', filename);
+            console.log('Total reports exported:', mentorReports.length);
+            console.log('Total clients exported:', mentorClients.length);
             
             // Save file
             XLSX.writeFile(wb, filename);
             
         } catch (error) {
-            console.error('Error exporting to Excel:', error);
-            alert('Failed to export to Excel. Please try again.');
+            console.error('Error exporting single report:', error);
+            alert('Failed to export report. Please try again.');
         }
     };
 
@@ -387,6 +579,33 @@ const MCHReports = ({ openModalRef }) => {
         return filtered;
     }, [reports, regionFilter, mentorFilter]);
 
+    // Calculate stats for display
+    const reportStats = useMemo(() => {
+        const totalReports = filteredReports.length;
+        const totalGreen = filteredReports.reduce((sum, r) => sum + (r.total_green || 0), 0);
+        const totalBlue = filteredReports.reduce((sum, r) => sum + (r.total_blue || 0), 0);
+        
+        return {
+            totalReports,
+            totalGreen,
+            totalBlue
+        };
+    }, [filteredReports]);
+
+    // Pagination
+    const paginatedReports = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredReports.slice(startIndex, endIndex);
+    }, [filteredReports, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredReports.length / itemsPerPage);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [regionFilter, mentorFilter]);
+
     return (
         <div className="min-w-0">
             <div className="flex justify-between items-center mb-4">
@@ -397,8 +616,67 @@ const MCHReports = ({ openModalRef }) => {
                     disabled={filteredReports.length === 0}
                 >
                     <Download className="h-4 w-4" />
-                    Export to Excel
+                    Export
                 </button>
+            </div>
+
+            {/* Stats Cards - Same as Dashboard */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <div className="p-4 sm:p-5">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <FileText className="h-6 w-6 text-green-500" />
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt className="text-sm font-medium text-neutral-500 truncate">Total MCH Reports</dt>
+                                    <dd className="flex items-baseline">
+                                        <div className="text-2xl font-semibold text-neutral-900">{reportStats.totalReports}</div>
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <div className="p-4 sm:p-5">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center">
+                                    <span className="text-green-600 font-bold">G</span>
+                                </div>
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt className="text-sm font-medium text-neutral-500 truncate">Total Green Cases (Mothers)</dt>
+                                    <dd className="flex items-baseline">
+                                        <div className="text-2xl font-semibold text-neutral-900">{reportStats.totalGreen}</div>
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <div className="p-4 sm:p-5">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <span className="text-blue-600 font-bold">B</span>
+                                </div>
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt className="text-sm font-medium text-neutral-500 truncate">Total Blue Cases (Children)</dt>
+                                    <dd className="flex items-baseline">
+                                        <div className="text-2xl font-semibold text-neutral-900">{reportStats.totalBlue}</div>
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
@@ -470,7 +748,7 @@ const MCHReports = ({ openModalRef }) => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {filteredReports.map((report) => {
+                                {paginatedReports.map((report) => {
                                     const relatedClients = clients.filter(
                                         (c) =>
                                             c.mentor_mother_name === report.mentor_mother_name &&
@@ -499,17 +777,58 @@ const MCHReports = ({ openModalRef }) => {
                                             </td>
                                             {showAllColumns && (
                                                 <>
-                                                    <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
-                                                        {report.mentor_mother_name}
+                                                    <td 
+                                                        className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4"
+                                                        onDoubleClick={() => handleCellDoubleClick(report.id, 'mentor_mother_name', report.mentor_mother_name)}
+                                                        style={{ cursor: isSuperAdmin ? 'pointer' : 'default' }}
+                                                    >
+                                                        {editingCell?.reportId === report.id && editingCell?.field === 'mentor_mother_name' ? (
+                                                            <input
+                                                                type="text"
+                                                                value={editingCell.value}
+                                                                onChange={handleCellChange}
+                                                                onBlur={handleCellBlur}
+                                                                onKeyDown={handleCellKeyPress}
+                                                                className="w-full border border-primary-500 rounded px-1 py-0.5 text-sm"
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <span className={isSuperAdmin ? 'hover:bg-primary-50 px-1 rounded' : ''}>
+                                                                {report.mentor_mother_name}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-3 py-3 text-sm text-neutral-500 sm:px-6 sm:py-4 whitespace-nowrap">
                                                         {addedBy}
                                                     </td>
                                                     <td className="px-3 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">
                                                         <div className="flex items-center justify-end gap-1">
-                                                            <button type="button" onClick={() => setViewReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
-                                                            <button type="button" onClick={() => openEditReport(report)} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Edit" disabled={!!report.fromRegistrations}><Pencil className="h-4 w-4" /></button>
-                                                            <button type="button" onClick={() => handleDeleteReport(report)} className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" disabled={!!report.fromRegistrations}><Trash2 className="h-4 w-4" /></button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => setViewReport(report)} 
+                                                                className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" 
+                                                                title="View detailed report" 
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => openEditReport(report)} 
+                                                                className="p-1.5 text-neutral-500 hover:text-primary-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" 
+                                                                title="Edit report" 
+                                                                disabled={!!report.fromRegistrations}
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </button>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => handleDeleteReport(report)} 
+                                                                className="p-1.5 text-neutral-500 hover:text-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" 
+                                                                title="Delete report" 
+                                                                disabled={!!report.fromRegistrations}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -640,7 +959,7 @@ const MCHReports = ({ openModalRef }) => {
                                         <div className="mt-3 space-y-1 text-sm text-neutral-800">
                                             <div className="flex flex-wrap gap-4">
                                                 <span>
-                                                    <span className="font-semibold">Mentor Mother’s Name:</span>{' '}
+                                                    <span className="font-semibold">Mentor Mother's Name:</span>{' '}
                                                     {viewReport.mentor_mother_name}
                                                 </span>
                                                 <span>
@@ -701,13 +1020,27 @@ const MCHReports = ({ openModalRef }) => {
                                             )}
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setViewReport(null)}
-                                        className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded"
-                                        aria-label="Close"
-                                    >
-                                        <X className="h-5 w-5" />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                console.log('Single export button clicked');
+                                                exportSingleReport();
+                                            }}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
+                                            title="Export this report"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                            Export
+                                        </button>
+                                        <button
+                                            onClick={() => setViewReport(null)}
+                                            className="flex-shrink-0 p-1 text-neutral-400 hover:text-neutral-500 rounded"
+                                            aria-label="Close"
+                                        >
+                                            <X className="h-5 w-5" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="px-4 py-4 overflow-y-auto flex-1 space-y-6">
@@ -930,6 +1263,14 @@ const MCHReports = ({ openModalRef }) => {
                     </div>
                 </div>
             )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={filteredReports.length}
+                onItemsPerPageChange={setItemsPerPage}
+            />
         </div>
     );
 };

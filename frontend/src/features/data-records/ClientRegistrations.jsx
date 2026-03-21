@@ -3,6 +3,8 @@ import { getAllClients, createClient, updateClient, deleteClient, getMentorMothe
 import { useAuthStore } from '../../store/authStore';
 import { X, Eye, Pencil, Trash2, FileText } from 'lucide-react';
 import { DATA_RECORD_SECTIONS, VALUE_LABELS, getLabelForValue } from './dataRecordFormStructure';
+import Pagination from '../../components/common/Pagination';
+import ExpandableFollowUpTable from '../../components/data-records/ExpandableFollowUpTable';
 import {
     ResponsiveContainer,
     BarChart,
@@ -110,6 +112,38 @@ const buildPregnanciesFromClient = (c) => {
     return list;
 };
 
+const FollowUpByList = ({ followupCreators }) => {
+    const [showAll, setShowAll] = useState(false);
+    
+    const getNameFromEmail = (email) => {
+        const nameMatch = email.match(/^([^.]+)@/);
+        return nameMatch ? nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1) : email;
+    };
+    
+    const names = followupCreators.map(getNameFromEmail);
+    const displayNames = showAll ? names : names.slice(0, 2);
+    const hasMore = names.length > 2;
+    
+    return (
+        <span className="ml-1 text-xs text-neutral-400">
+            by {displayNames.join(', ')}
+            {hasMore && (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowAll(!showAll);
+                    }}
+                    className="text-primary-600 hover:text-primary-700 underline ml-1"
+                >
+                    {showAll ? 'less' : `+${names.length - 2} more`}
+                </button>
+            )}
+        </span>
+    );
+};
+
 const ClientRegistrations = ({ openModalRef }) => {
     const { user: currentUser } = useAuthStore();
     const [clients, setClients] = useState([]);
@@ -143,6 +177,8 @@ const ClientRegistrations = ({ openModalRef }) => {
     const [reportLoading, setReportLoading] = useState(false);
     const [followUpHistoryField, setFollowUpHistoryField] = useState(null);
     const [expandedFollowUps, setExpandedFollowUps] = useState(new Set());
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     const fetchClients = async () => {
         try {
@@ -431,6 +467,20 @@ const ClientRegistrations = ({ openModalRef }) => {
         
         return filtered;
     }, [clients, regionFilter, mentorFilter, searchTerm]);
+
+    // Pagination
+    const paginatedClients = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredClients.slice(startIndex, endIndex);
+    }, [filteredClients, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [regionFilter, mentorFilter, searchTerm]);
 
     // Memoize options
     const regionOptions = useMemo(() => 
@@ -762,34 +812,28 @@ const ClientRegistrations = ({ openModalRef }) => {
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Client Name</th>
-                                    <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Added by</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Follow-ups</th>
                                     <th className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {filteredClients.map((client) => (
+                                {paginatedClients.map((client) => (
                                     <tr key={client.id} className="hover:bg-neutral-50">
                                         <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{client.mentor_mother_name}</td>
                                         <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{client.date}</td>
                                         <td className="px-3 py-3 text-sm font-medium text-primary-600 sm:px-4 sm:py-3 whitespace-nowrap">{client.name}</td>
                                         <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">
-                                            {client.created_by_name || client.created_by_email || '—'}
-                                        </td>
-                                        <td className="px-3 py-3 text-sm text-neutral-500 sm:px-4 sm:py-3 whitespace-nowrap">
                                             {client.followup_count ?? 0}
                                             {Array.isArray(client.followup_created_by) && client.followup_created_by.length > 0 && (
-                                                <span className="ml-1 text-xs text-neutral-400">
-                                                    by {client.followup_created_by.join(', ')}
-                                                </span>
+                                                <FollowUpByList followupCreators={client.followup_created_by} />
                                             )}
                                         </td>
                                         <td className="px-3 py-3 text-sm sm:px-4 sm:py-3 whitespace-nowrap text-right">
                                             <div className="flex items-center justify-end gap-1">
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); setViewClient(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Edit"><Pencil className="h-4 w-4" /></button>
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); openFollowUp(client); }} className="px-2 py-1 text-xs border border-primary-500 text-primary-600 rounded hover:bg-primary-50" title="Add follow-up">F/U</button>
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); openReport(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Client report"><FileText className="h-4 w-4" /></button>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); openFollowUp(client); }} className="px-2 py-1 text-xs border border-primary-500 text-primary-600 rounded hover:bg-primary-50" title="Add follow-up">Follow Up</button>
+                                                {/* <button type="button" onClick={(e) => { e.stopPropagation(); openReport(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Client report"><FileText className="h-4 w-4" /></button> */}
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(client); }} className="p-1.5 text-neutral-500 hover:text-red-600 rounded" title="Delete"><Trash2 className="h-4 w-4" /></button>
                                             </div>
                                         </td>
@@ -797,7 +841,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                                 ))}
                                 {clients.length === 0 && (
                                     <tr>
-                                        <td colSpan="7" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
+                                        <td colSpan="5" className="px-3 py-4 text-sm text-neutral-500 text-center sm:px-4">
                                             No registrations found.
                                         </td>
                                     </tr>
@@ -807,6 +851,14 @@ const ClientRegistrations = ({ openModalRef }) => {
                     </div>
                 )}
             </div>
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={filteredClients.length}
+                onItemsPerPageChange={setItemsPerPage}
+            />
 
             {/* View detail modal – formatted daily report style */}
             {viewClient && (() => {
@@ -1200,7 +1252,21 @@ const ClientRegistrations = ({ openModalRef }) => {
                             <div className="px-4 py-4 overflow-y-auto flex-1 space-y-4 text-sm">
                                 {followUpsByClient[followUpClient.id] && followUpsByClient[followUpClient.id].length > 0 && (
                                     <div className="rounded-md bg-neutral-50 border border-neutral-200 p-3">
-                                        <p className="text-sm font-medium text-neutral-800 mb-1">Previous record (summary)</p>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <p className="text-sm font-medium text-neutral-800">Previous record (summary)</p>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    openReport(followUpClient);
+                                                }}
+                                                className="p-1.5 text-neutral-500 hover:text-primary-600 rounded border border-neutral-300 hover:border-primary-500 hover:bg-primary-50"
+                                                title="Client report"
+                                            >
+                                               {/*  <FileText className="h-4 w-4" />*/}See client report
+                                            </button>
+                                        </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs sm:text-sm text-neutral-700">
                                             <div><span className="font-semibold">Identified problem:</span> {followUpsByClient[followUpClient.id][0].data?.identified_problem || followUpsByClient[followUpClient.id][0].notes || '-'}</div>
                                             <div><span className="font-semibold">Counseling given:</span> {followUpsByClient[followUpClient.id][0].data?.counseling_given || '-'}</div>
@@ -1326,87 +1392,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                                     <h4 className="text-sm font-semibold text-neutral-800 mb-2">
                                         Previous follow-ups ({(followUpsByClient[followUpClient.id] || []).length})
                                     </h4>
-                                    {!(followUpsByClient[followUpClient.id] || []).length ? (
-                                        <p className="text-xs text-neutral-500">No follow-ups recorded yet.</p>
-                                    ) : (
-                                        <div className="space-y-1">
-                                            {[...followUpsByClient[followUpClient.id]].reverse().map((fu, index) => {
-                                                const originalIndex = followUpsByClient[followUpClient.id].length - 1 - index;
-                                                const isExpanded = expandedFollowUps.has(fu.id);
-                                                return (
-                                                    <div key={fu.id} className="border border-neutral-200 rounded-md">
-                                                        <div 
-                                                            className="flex items-center justify-between px-3 py-2 bg-neutral-50 border-b border-neutral-200 cursor-pointer hover:bg-neutral-100"
-                                                            onClick={() => toggleFollowUpExpansion(fu.id)}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <svg 
-                                                                    className={`w-4 h-4 text-neutral-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} 
-                                                                    fill="none" 
-                                                                    stroke="currentColor" 
-                                                                    viewBox="0 0 24 24"
-                                                                >
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                                </svg>
-                                                                <span className="text-sm font-medium text-neutral-700">
-                                                                    Follow-up {originalIndex + 1}
-                                                                </span>
-                                                                <span className="text-xs text-neutral-500">
-                                                                    {fu.date || (fu.created_at && new Date(fu.created_at).toLocaleDateString())}
-                                                                </span>
-                                                                <span className="text-xs text-neutral-500">
-                                                                    by {fu.created_by_name || fu.created_by_email || '—'}
-                                                                </span>
-                                                            </div>
-                                                            <button 
-                                                                type="button"
-                                                                className="text-xs text-primary-600 hover:text-primary-700"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setViewFollowUpDetail(fu);
-                                                                }}
-                                                            >
-                                                                View detail →
-                                                            </button>
-                                                        </div>
-                                                        {isExpanded && (
-                                                            <>
-                                                                {fu.notes && (
-                                                                    <div className="px-3 py-2 text-xs text-neutral-600 bg-white border-b border-neutral-100">
-                                                                        <span className="font-medium">Notes:</span> {fu.notes}
-                                                                    </div>
-                                                                )}
-                                                                {fu.data && typeof fu.data === 'object' && Object.keys(fu.data).length > 0 && (
-                                                                    <div className="px-3 py-2 text-xs text-neutral-600 bg-white">
-                                                                        <div className="grid grid-cols-2 gap-2">
-                                                                            {fu.data.weight != null && fu.data.weight !== '' && (
-                                                                                <div><span className="font-medium">Weight:</span> {fu.data.weight}kg</div>
-                                                                            )}
-                                                                            {fu.data.muac != null && fu.data.muac !== '' && (
-                                                                                <div><span className="font-medium">MUAC:</span> {fu.data.muac}cm</div>
-                                                                            )}
-                                                                            {fu.data.identified_problem && (
-                                                                                <div className="col-span-2"><span className="font-medium">Problem:</span> {fu.data.identified_problem}</div>
-                                                                            )}
-                                                                            {fu.data.counseling_given && (
-                                                                                <div className="col-span-2"><span className="font-medium">Counseling:</span> {fu.data.counseling_given}</div>
-                                                                            )}
-                                                                            {fu.data.anything_additional && (
-                                                                                <div className="col-span-2"><span className="font-medium">Additional:</span> {fu.data.anything_additional}</div>
-                                                                            )}
-                                                                            {fu.data.problem_faced_by_mm && (
-                                                                                <div className="col-span-2"><span className="font-medium">MM Problem:</span> {fu.data.problem_faced_by_mm}</div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                                    <ExpandableFollowUpTable followups={followUpsByClient[followUpClient.id] || []} />
                                 </div>
                             </div>
                         </div>
@@ -1495,32 +1481,7 @@ const ClientRegistrations = ({ openModalRef }) => {
 
                                         <section>
                                             <h3 className="text-sm font-semibold text-neutral-800 mb-2">Follow-ups ({reportFollowUps.length})</h3>
-                                            {reportFollowUps.length === 0 ? (
-                                                <p className="text-neutral-500">No follow-ups recorded.</p>
-                                            ) : (
-                                                <div className="overflow-x-auto border border-neutral-200 rounded-md">
-                                                    <table className="min-w-full text-sm">
-                                                        <thead className="bg-neutral-50">
-                                                            <tr>
-                                                                <th className="px-3 py-2 text-left">Date</th>
-                                                                <th className="px-3 py-2 text-left">By</th>
-                                                                <th className="px-3 py-2 text-left">Notes</th>
-                                                                <th className="px-3 py-2 text-left">Action</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-neutral-100">
-                                                            {reportFollowUps.map((fu) => (
-                                                                <tr key={fu.id}>
-                                                                    <td className="px-3 py-2">{fu.date || (fu.created_at && fu.created_at.split('T')[0])}</td>
-                                                                    <td className="px-3 py-2">{fu.created_by_name || fu.created_by_email || '—'}</td>
-                                                                    <td className="px-3 py-2 max-w-xs truncate">{fu.notes || '—'}</td>
-                                                                    <td className="px-3 py-2"><button type="button" onClick={() => setViewFollowUpDetail(fu)} className="text-primary-600 hover:text-primary-700 text-xs">View detail</button></td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
+                                            <ExpandableFollowUpTable followups={reportFollowUps} />
                                         </section>
 
                                         {buildWeightMuacChartData().length > 0 && (

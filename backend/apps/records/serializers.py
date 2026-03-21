@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import ClientRegistration, ClientFollowUp, MCHReport, WeeklyPlan
+from .validators import validate_age, validate_positive_integer, validate_weight, validate_muac, validate_sex
 
 
 def get_created_by_email(obj):
@@ -39,6 +40,36 @@ class ClientRegistrationSerializer(serializers.ModelSerializer):
         model = ClientRegistration
         fields = "__all__"
         read_only_fields = ["id", "created_by", "created_at", "updated_at", "folder_number"]
+
+    def validate_age(self, value):
+        """Validate client age."""
+        validate_age(value)
+        return value
+
+    def validate_sex(self, value):
+        """Validate sex field."""
+        validate_sex(value)
+        return value
+
+    def validate_weight(self, value):
+        """Validate weight."""
+        validate_weight(value)
+        return value
+
+    def validate_muac(self, value):
+        """Validate MUAC."""
+        validate_muac(value)
+        return value
+
+    def validate_total_green_cases(self, value):
+        """Validate total green cases."""
+        validate_positive_integer(value)
+        return value
+
+    def validate_total_blue_cases(self, value):
+        """Validate total blue cases."""
+        validate_positive_integer(value)
+        return value
 
     def get_created_by_email(self, obj):
         return get_created_by_email(obj)

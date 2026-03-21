@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getAllPlans, createPlan, updatePlan, deletePlan, getMentorMothers } from '../../services/recordService';
 import { X, Eye, Pencil, Trash2, Plus } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
 
 const OTHER_MENTOR = '__other__';
 
@@ -21,6 +22,8 @@ const WeeklyPlans = ({ openModalRef }) => {
         objective: '',
         observation: ''
     });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     const fetchPlans = async () => {
         try {
@@ -95,6 +98,15 @@ const WeeklyPlans = ({ openModalRef }) => {
 
     const mentorSelectValue = mentorMotherNames.includes(formData.mentor_mother_name) ? formData.mentor_mother_name : (formData.mentor_mother_name ? OTHER_MENTOR : '');
 
+    // Pagination
+    const paginatedPlans = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return plans.slice(startIndex, endIndex);
+    }, [plans, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(plans.length / itemsPerPage);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!(formData.mentor_mother_name || '').trim()) {
@@ -152,7 +164,7 @@ const WeeklyPlans = ({ openModalRef }) => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {plans.map((plan) => (
+                                {paginatedPlans.map((plan) => (
                                     <tr key={plan.id} className="hover:bg-neutral-50">
                                         <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{plan.date}</td>
                                         <td className="px-3 py-3 text-sm text-neutral-900 sm:px-4 sm:py-3 whitespace-nowrap">{plan.day_of_week}</td>
@@ -285,6 +297,14 @@ const WeeklyPlans = ({ openModalRef }) => {
                     </div>
                 </div>
             )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={plans.length}
+                onItemsPerPageChange={setItemsPerPage}
+            />
         </div>
     );
 };

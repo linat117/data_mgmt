@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getAuditLogs } from '../../services/auditService';
 import { Search } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
 
 const AuditLogs = () => {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     useEffect(() => {
         const fetchLogs = async () => {
@@ -30,6 +33,20 @@ const AuditLogs = () => {
             (log.description && log.description.toLowerCase().includes(term))
         );
     });
+
+    // Pagination
+    const paginatedLogs = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredLogs.slice(startIndex, endIndex);
+    }, [filteredLogs, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+
+    // Reset page when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     return (
         <div className="flex flex-col h-full min-w-0">
@@ -71,7 +88,7 @@ const AuditLogs = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-200">
-                                {filteredLogs.map((log) => (
+                                {paginatedLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-neutral-50 transition-colors">
                                         <td className="px-3 py-3 whitespace-nowrap text-xs sm:text-sm text-neutral-500 sm:px-6 sm:py-4">
                                             {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
@@ -90,7 +107,7 @@ const AuditLogs = () => {
                                         </td>
                                     </tr>
                                 ))}
-                                {filteredLogs.length === 0 && (
+                                {paginatedLogs.length === 0 && (
                                     <tr>
                                         <td colSpan="6" className="px-3 py-10 text-center text-neutral-500 sm:px-6">
                                             No matching audit logs found.
@@ -101,6 +118,14 @@ const AuditLogs = () => {
                         </table>
                     </div>
                 )}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={filteredLogs.length}
+                    onItemsPerPageChange={setItemsPerPage}
+                />
             </div>
         </div>
     );
