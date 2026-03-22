@@ -5,11 +5,17 @@ import { X, Eye, Pencil, Trash2, Download, FileText } from 'lucide-react';
 import { MCH_CATEGORIES, getInitialMCHMetrics } from './mchFormStructure';
 import Pagination from '../../components/common/Pagination';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const OTHER_MENTOR = '__other__';
 
 const MCHReports = ({ openModalRef }) => {
     const { user } = useAuthStore();
+    
+    // Check if user is super admin
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    
     const [reports, setReports] = useState([]);
     const [clients, setClients] = useState([]);
     const [mentorMotherNames, setMentorMotherNames] = useState([]);
@@ -33,9 +39,32 @@ const MCHReports = ({ openModalRef }) => {
     const [itemsPerPage, setItemsPerPage] = useState(25);
     const [sortBy, setSortBy] = useState('created_at');
     const [sortOrder, setSortOrder] = useState('desc');
+    const [selectedReports, setSelectedReports] = useState(new Set()); // Track selected report IDs
 
-    // Check if user is super admin
-    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    // Handle row selection
+    const handleSelectReport = (reportId) => {
+        setSelectedReports(prev => {
+            const newSelection = new Set(prev);
+            if (newSelection.has(reportId)) {
+                newSelection.delete(reportId);
+            } else {
+                newSelection.add(reportId);
+            }
+            return newSelection;
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedReports.size === paginatedReports.length) {
+            setSelectedReports(new Set());
+        } else {
+            setSelectedReports(new Set(paginatedReports.map(r => r.id)));
+        }
+    };
+
+    const clearSelection = () => {
+        setSelectedReports(new Set());
+    };
 
     // Handle inline editing
     const handleCellDoubleClick = (reportId, field, currentValue) => {
@@ -96,6 +125,139 @@ const MCHReports = ({ openModalRef }) => {
             e.target.blur();
         } else if (e.key === 'Escape') {
             setEditingCell(null);
+        }
+    };
+
+    // Export selected rows function
+    const exportSelectedRows = () => {
+        if (selectedReports.size === 0) {
+            alert('Please select at least one row to export.');
+            return;
+        }
+
+        try {
+            // Get selected reports from filtered reports
+            const selectedReportData = filteredReports.filter(report => selectedReports.has(report.id));
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Summary sheet - selected reports only
+            const summaryData = selectedReportData.map(report => {
+                const addedBy = report.created_by_name || report.created_by_email || '—';
+                
+                return {
+                    'Mentor Mother Name': report.mentor_mother_name || '—',
+                    'Date': report.date || '—',
+                    'Total Green (Mother)': report.total_green || 0,
+                    'Total Blue (Children)': report.total_blue || 0,
+                    'Added By': addedBy,
+                    'Created At': report.created_at || '—',
+                    'Region': report.created_by_region_code || '—'
+                };
+            });
+            
+            const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'Selected Reports Summary');
+            
+            // Detailed metrics sheet for selected reports with metrics
+            const detailedData = [];
+            selectedReportData.forEach(report => {
+                if (!report.fromRegistrations && report.metrics) {
+                    MCH_CATEGORIES.forEach(category => {
+                        category.activities.forEach(activity => {
+                            const value = (report.metrics || {})[activity.key] === 0 ? 0 : (report.metrics || {})[activity.key] || '';
+                            const remark = (report.metrics || {})[`${activity.key}_remark`] || '';
+                            
+                            detailedData.push({
+                                'Mentor Mother Name': report.mentor_mother_name,
+                                'Date': report.date,
+                                'Report ID': report.id,
+                                'Category No': category.no,
+                                'Category Name': category.name,
+                                'Activity': activity.label,
+                                'No. Achieved': value,
+                                'Remark': remark,
+                                'Region': report.created_by_region_code || '—'
+                            });
+                        });
+                    });
+                }
+            });
+            
+            if (detailedData.length > 0) {
+                const detailedWs = XLSX.utils.json_to_sheet(detailedData);
+                XLSX.utils.book_append_sheet(wb, detailedWs, 'Service Metrics');
+            }
+            
+            // Related clients sheet - clients for selected reports only
+            const selectedClients = [];
+            selectedReportData.forEach(report => {
+                const reportClients = clients.filter(
+                    (c) => c.mentor_mother_name === report.mentor_mother_name && c.date === report.date
+                );
+                reportClients.forEach(client => {
+                    if (!selectedClients.find(c => c.id === client.id)) {
+                        selectedClients.push({
+                            ...client,
+                            'Report Date': report.date,
+                            'Report ID': report.id
+                        });
+                    }
+                });
+            });
+            
+            if (selectedClients.length > 0) {
+                const clientData = selectedClients.map(client => ({
+                    'Report ID': client['Report ID'],
+                    'Report Date': client['Report Date'],
+                    'Mentor Mother Name': client.mentor_mother_name,
+                    'Client Name': client.name,
+                    'Age': client.age,
+                    'Sex': client.sex,
+                    'Folder Number': client.folder_number,
+                    'Address': client.address,
+                    'Weight': client.weight || '—',
+                    'MUAC': client.muac || '—',
+                    'Total Green Cases': client.total_green_cases || 0,
+                    'Total Blue Cases': client.total_blue_cases || 0,
+                    'Identified Problem': client.identified_problem,
+                    'Counseling Given': client.counseling_given,
+                    'Demonstration Shown': client.demonstration_shown,
+                    'Anything Additional': client.anything_additional,
+                    'Problem Faced by MM': client.problem_faced_by_mm,
+                    'Added By': client.created_by_name || client.created_by_email || '—',
+                    'Created At': client.created_at,
+                    'Region': client.created_by_region_code || '—'
+                }));
+                
+                const clientWs = XLSX.utils.json_to_sheet(clientData);
+                XLSX.utils.book_append_sheet(wb, clientWs, 'Related Clients');
+            }
+            
+            // Summary statistics sheet
+            const statsData = [
+                { 'Metric': 'Selected Reports Exported', 'Count': selectedReportData.length },
+                { 'Metric': 'Related Clients Exported', 'Count': selectedClients.length },
+                { 'Metric': 'Total Green Cases (Mothers)', 'Count': selectedReportData.reduce((sum, r) => sum + (r.total_green || 0), 0) },
+                { 'Metric': 'Total Blue Cases (Children)', 'Count': selectedReportData.reduce((sum, r) => sum + (r.total_blue || 0), 0) },
+                { 'Metric': 'Export Date', 'Count': new Date().toISOString().split('T')[0] },
+                { 'Metric': 'Applied Filters', 'Count': `Region: ${regionFilter || 'All'}, Mentor: ${mentorFilter || 'All'}` }
+            ];
+            
+            const statsWs = XLSX.utils.json_to_sheet(statsData);
+            XLSX.utils.book_append_sheet(wb, statsWs, 'Export Statistics');
+            
+            // Generate filename
+            const today = new Date().toISOString().split('T')[0];
+            const filename = `MCH_Selected_Reports_${today}.xlsx`;
+            
+            // Save file
+            XLSX.writeFile(wb, filename);
+            
+        } catch (error) {
+            console.error('Error exporting selected rows:', error);
+            alert('Failed to export selected rows. Please try again.');
         }
     };
 
@@ -235,71 +397,57 @@ const MCHReports = ({ openModalRef }) => {
             return;
         }
         
-        console.log('Exporting single report with history:', viewReport);
+        console.log('Exporting current report details:', viewReport);
         
         try {
-            // Get all reports for this mentor mother (not just current one)
-            const mentorReports = reports.filter(
-                (r) => r.mentor_mother_name === viewReport.mentor_mother_name
-            );
-            
-            console.log('Found mentor reports:', mentorReports.length);
-            
             // Create workbook
             const wb = XLSX.utils.book_new();
             
-            // Summary sheet - all reports for this mentor mother
-            const summaryData = mentorReports.map(report => {
-                const addedBy = report.created_by_name || report.created_by_email || '—';
-                
-                return {
-                    'Mentor Mother Name': report.mentor_mother_name || '—',
-                    'Date': report.date || '—',
-                    'Total Green (Mother)': report.total_green || 0,
-                    'Total Blue (Children)': report.total_blue || 0,
-                    'Added By': addedBy,
-                    'Created At': report.created_at || '—'
-                };
-            });
+            // Report summary sheet - current report only
+            const summaryData = [{
+                'Mentor Mother Name': viewReport.mentor_mother_name || '—',
+                'Date': viewReport.date || '—',
+                'Total Green (Mother)': viewReport.total_green || 0,
+                'Total Blue (Children)': viewReport.total_blue || 0,
+                'Added By': viewReport.created_by_name || viewReport.created_by_email || '—',
+                'Created At': viewReport.created_at || '—',
+                'Region': viewReport.created_by_region_code || '—'
+            }];
             
             const summaryWs = XLSX.utils.json_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(wb, summaryWs, 'All Reports Summary');
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'Report Summary');
             
-            // Detailed metrics sheet for all reports with metrics
-            const detailedData = [];
-            mentorReports.forEach(report => {
-                if (!report.fromRegistrations && report.metrics) {
-                    MCH_CATEGORIES.forEach(category => {
-                        category.activities.forEach(activity => {
-                            const value = (report.metrics || {})[activity.key] === 0 ? 0 : (report.metrics || {})[activity.key] || '';
-                            const remark = (report.metrics || {})[`${activity.key}_remark`] || '';
-                            
-                            detailedData.push({
-                                'Mentor Mother Name': report.mentor_mother_name,
-                                'Date': report.date,
-                                'Category No': category.no,
-                                'Category Name': category.name,
-                                'Activity': activity.label,
-                                'No. Achieved': value,
-                                'Remark': remark
-                            });
+            // Detailed metrics sheet - current report metrics only
+            if (!viewReport.fromRegistrations && viewReport.metrics) {
+                const detailedData = [];
+                MCH_CATEGORIES.forEach(category => {
+                    category.activities.forEach(activity => {
+                        const value = (viewReport.metrics || {})[activity.key] === 0 ? 0 : (viewReport.metrics || {})[activity.key] || '';
+                        const remark = (viewReport.metrics || {})[`${activity.key}_remark`] || '';
+                        
+                        detailedData.push({
+                            'No': category.no,
+                            'Category': category.name,
+                            'Activity': activity.label,
+                            'No. Achieved': value,
+                            'Remark': remark
                         });
                     });
+                });
+                
+                if (detailedData.length > 0) {
+                    const detailedWs = XLSX.utils.json_to_sheet(detailedData);
+                    XLSX.utils.book_append_sheet(wb, detailedWs, 'Service Metrics');
                 }
-            });
-            
-            if (detailedData.length > 0) {
-                const detailedWs = XLSX.utils.json_to_sheet(detailedData);
-                XLSX.utils.book_append_sheet(wb, detailedWs, 'All Service Metrics');
             }
             
-            // Related clients sheet - all clients for this mentor mother
-            const mentorClients = clients.filter(
-                (c) => c.mentor_mother_name === viewReport.mentor_mother_name
+            // Related clients sheet - clients for this specific report only
+            const reportClients = clients.filter(
+                (c) => c.mentor_mother_name === viewReport.mentor_mother_name && c.date === viewReport.date
             );
             
-            if (mentorClients.length > 0) {
-                const clientData = mentorClients.map(client => ({
+            if (reportClients.length > 0) {
+                const clientData = reportClients.map(client => ({
                     'Mentor Mother Name': client.mentor_mother_name,
                     'Date': client.date,
                     'Client Name': client.name,
@@ -317,21 +465,34 @@ const MCHReports = ({ openModalRef }) => {
                     'Anything Additional': client.anything_additional,
                     'Problem Faced by MM': client.problem_faced_by_mm,
                     'Added By': client.created_by_name || client.created_by_email || '—',
-                    'Created At': client.created_at
+                    'Created At': client.created_at,
+                    'Region': client.created_by_region_code || '—'
                 }));
                 
                 const clientWs = XLSX.utils.json_to_sheet(clientData);
-                XLSX.utils.book_append_sheet(wb, clientWs, 'All Related Clients');
+                XLSX.utils.book_append_sheet(wb, clientWs, 'Related Clients');
             }
+            
+            // Statistics sheet - current report statistics
+            const statsData = [
+                { 'Metric': 'Report Date', 'Count': viewReport.date || '—' },
+                { 'Metric': 'Mentor Mother', 'Count': viewReport.mentor_mother_name || '—' },
+                { 'Metric': 'Total Green Cases (Mothers)', 'Count': viewReport.total_green || 0 },
+                { 'Metric': 'Total Blue Cases (Children)', 'Count': viewReport.total_blue || 0 },
+                { 'Metric': 'Related Clients', 'Count': reportClients.length },
+                { 'Metric': 'Export Date', 'Count': new Date().toISOString().split('T')[0] }
+            ];
+            
+            const statsWs = XLSX.utils.json_to_sheet(statsData);
+            XLSX.utils.book_append_sheet(wb, statsWs, 'Report Statistics');
             
             // Generate filename
             const mentorName = viewReport.mentor_mother_name.replace(/[^a-zA-Z0-9]/g, '_');
-            const today = new Date().toISOString().split('T')[0];
-            const filename = `MCH_History_${mentorName}_${today}.xlsx`;
+            const reportDate = viewReport.date || 'unknown_date';
+            const filename = `MCH_Report_${mentorName}_${reportDate}.xlsx`;
             
             console.log('Generated filename:', filename);
-            console.log('Total reports exported:', mentorReports.length);
-            console.log('Total clients exported:', mentorClients.length);
+            console.log('Total clients exported:', reportClients.length);
             
             // Save file
             XLSX.writeFile(wb, filename);
@@ -339,6 +500,156 @@ const MCHReports = ({ openModalRef }) => {
         } catch (error) {
             console.error('Error exporting single report:', error);
             alert('Failed to export report. Please try again.');
+        }
+    };
+
+    // Export single report as PDF function
+    const exportSingleReportPDF = () => {
+        if (!viewReport) {
+            console.log('No viewReport found');
+            return;
+        }
+        
+        console.log('Exporting current report as PDF:', viewReport);
+        
+        try {
+            // Create PDF document
+            const doc = new jsPDF();
+            
+            // Add title
+            doc.setFontSize(20);
+            doc.text('Maternal and Child Health Services Report', 105, 20, { align: 'center' });
+            
+            // Add report details
+            doc.setFontSize(12);
+            let yPosition = 40;
+            
+            // Basic information
+            doc.setFont(undefined, 'bold');
+            doc.text('Report Details:', 20, yPosition);
+            doc.setFont(undefined, 'normal');
+            yPosition += 10;
+            
+            doc.text(`Mentor Mother: ${viewReport.mentor_mother_name || '—'}`, 20, yPosition);
+            yPosition += 8;
+            doc.text(`Date: ${viewReport.date || '—'}`, 20, yPosition);
+            yPosition += 8;
+            doc.text(`Total Green Cases (Mothers): ${viewReport.total_green || 0}`, 20, yPosition);
+            yPosition += 8;
+            doc.text(`Total Blue Cases (Children): ${viewReport.total_blue || 0}`, 20, yPosition);
+            yPosition += 8;
+            doc.text(`Added By: ${viewReport.created_by_name || viewReport.created_by_email || '—'}`, 20, yPosition);
+            yPosition += 8;
+            doc.text(`Created At: ${viewReport.created_at || '—'}`, 20, yPosition);
+            
+            // Add metrics if available
+            if (!viewReport.fromRegistrations && viewReport.metrics) {
+                yPosition += 15;
+                doc.setFont(undefined, 'bold');
+                doc.text('Service Metrics:', 20, yPosition);
+                doc.setFont(undefined, 'normal');
+                yPosition += 10;
+                
+                MCH_CATEGORIES.forEach(category => {
+                    if (yPosition > 250) { // Add new page if needed
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`${category.no}. ${category.name}:`, 20, yPosition);
+                    doc.setFont(undefined, 'normal');
+                    yPosition += 8;
+                    
+                    category.activities.forEach(activity => {
+                        const value = (viewReport.metrics || {})[activity.key] === 0 ? 0 : (viewReport.metrics || {})[activity.key] || '';
+                        const remark = (viewReport.metrics || {})[`${activity.key}_remark`] || '';
+                        
+                        if (yPosition > 250) { // Add new page if needed
+                            doc.addPage();
+                            yPosition = 20;
+                        }
+                        
+                        doc.text(`  • ${activity.label}: ${value}`, 25, yPosition);
+                        yPosition += 6;
+                        if (remark) {
+                            doc.text(`    Remark: ${remark}`, 30, yPosition);
+                            yPosition += 6;
+                        }
+                    });
+                    yPosition += 10;
+                });
+            }
+            
+            // Add related clients if available
+            const reportClients = clients.filter(
+                (c) => c.mentor_mother_name === viewReport.mentor_mother_name && c.date === viewReport.date
+            );
+            
+            if (reportClients.length > 0) {
+                if (yPosition > 200) { // Add new page if needed
+                    doc.addPage();
+                    yPosition = 20;
+                }
+                
+                yPosition += 10;
+                doc.setFont(undefined, 'bold');
+                doc.text('Related Clients:', 20, yPosition);
+                doc.setFont(undefined, 'normal');
+                yPosition += 10;
+                
+                // Create table data for clients
+                const tableData = reportClients.map(client => [
+                    client.name || '—',
+                    client.age || '—',
+                    client.sex || '—',
+                    client.folder_number || '—',
+                    client.weight || '—',
+                    client.muac || '—',
+                    client.total_green_cases || 0,
+                    client.total_blue_cases || 0
+                ]);
+                
+                // Add table
+                doc.autoTable({
+                    head: [['Name', 'Age', 'Sex', 'Folder No', 'Weight', 'MUAC', 'Green Cases', 'Blue Cases']],
+                    body: tableData,
+                    startY: yPosition,
+                    theme: 'grid',
+                    styles: {
+                        fontSize: 10,
+                        cellPadding: 3
+                    },
+                    headStyles: {
+                        fillColor: [66, 139, 202],
+                        textColor: 255,
+                        fontStyle: 'bold'
+                    }
+                });
+            }
+            
+            // Add footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(10);
+                doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+                doc.text(`Exported on: ${new Date().toISOString().split('T')[0]}`, 105, 295, { align: 'center' });
+            }
+            
+            // Generate filename
+            const mentorName = viewReport.mentor_mother_name.replace(/[^a-zA-Z0-9]/g, '_');
+            const reportDate = viewReport.date || 'unknown_date';
+            const filename = `MCH_Report_${mentorName}_${reportDate}.pdf`;
+            
+            console.log('Generated PDF filename:', filename);
+            
+            // Save PDF
+            doc.save(filename);
+            
+        } catch (error) {
+            console.error('Error exporting single report as PDF:', error);
+            alert('Failed to export PDF. Please try again.');
         }
     };
 
@@ -600,14 +911,36 @@ const MCHReports = ({ openModalRef }) => {
         <div className="min-w-0">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-neutral-800 sm:text-xl">Maternal and Child Health Services Report</h2>
-                <button
-                    onClick={exportToExcel}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
-                    disabled={filteredReports.length === 0}
-                >
-                    <Download className="h-4 w-4" />
-                    Export
-                </button>
+                <div className="flex items-center gap-2">
+                    {selectedReports.size > 0 && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-neutral-600">
+                                {selectedReports.size} row{selectedReports.size !== 1 ? 's' : ''} selected
+                            </span>
+                            <button
+                                onClick={clearSelection}
+                                className="text-xs text-neutral-500 hover:text-neutral-700 underline"
+                            >
+                                Clear
+                            </button>
+                            <button
+                                onClick={exportSelectedRows}
+                                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                            >
+                                <Download className="h-4 w-4" />
+                                Export Selected
+                            </button>
+                        </div>
+                    )}
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                        disabled={filteredReports.length === 0}
+                    >
+                        <Download className="h-4 w-4" />
+                        Export All
+                    </button>
+                </div>
             </div>
 
             {/* Stats Cards - Same as Dashboard */}
@@ -743,6 +1076,14 @@ const MCHReports = ({ openModalRef }) => {
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50">
                                 <tr>
+                                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider w-12">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedReports.size === paginatedReports.length && paginatedReports.length > 0}
+                                            onChange={handleSelectAll}
+                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+                                        />
+                                    </th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Mentor Mother</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Date</th>
                                     <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Green Cases</th>
@@ -760,6 +1101,14 @@ const MCHReports = ({ openModalRef }) => {
                                     const addedBy = report.created_by_name || report.created_by_email || '—';
                                     return (
                                         <tr key={report.id} className="hover:bg-neutral-50">
+                                            <td className="px-3 py-3 whitespace-nowrap text-sm text-neutral-900 sm:px-6 sm:py-4">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedReports.has(report.id)}
+                                                    onChange={() => handleSelectReport(report.id)}
+                                                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+                                                />
+                                            </td>
                                             <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-primary-600 sm:px-6 sm:py-4">
                                                 {report.mentor_mother_name || '—'}
                                             </td>
@@ -789,14 +1138,14 @@ const MCHReports = ({ openModalRef }) => {
                                                             {isSuperAdmin && (
                                                                 <>
                                                                     <button
-                                                                        onClick={() => handleEdit(report)}
+                                                                        onClick={() => openEditReport(report)}
                                                                         className="text-indigo-600 hover:text-indigo-900"
                                                                         title="Edit report"
                                                                     >
                                                                         <Pencil className="h-4 w-4" />
                                                                     </button>
                                                                     <button
-                                                                        onClick={() => handleDelete(report.id)}
+                                                                        onClick={() => handleDeleteReport(report)}
                                                                         className="text-red-600 hover:text-red-900"
                                                                         title="Delete report"
                                                                     >
@@ -1003,10 +1352,22 @@ const MCHReports = ({ openModalRef }) => {
                                                 exportSingleReport();
                                             }}
                                             className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
-                                            title="Export this report"
+                                            title="Export this report as Excel"
                                         >
                                             <Download className="h-4 w-4" />
-                                            Export
+                                            Export Excel
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                console.log('PDF export button clicked');
+                                                exportSingleReportPDF();
+                                            }}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                                            title="Export this report as PDF"
+                                        >
+                                            <FileText className="h-4 w-4" />
+                                            Export PDF
                                         </button>
                                         <button
                                             onClick={() => setViewReport(null)}
