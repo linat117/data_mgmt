@@ -122,51 +122,60 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+# Temporarily using SQLite to avoid PostgreSQL connection issues
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+# Original PostgreSQL code (commented out for now)
 # Set DATABASE_URL (e.g. from Neon: postgresql://user:pass@host/db?sslmode=require) to use Neon or any PostgreSQL host.
 # .env file takes precedence over system environment variables (Windows can have stale DATABASE_URL).
 
-_db_url = None
-_env_path = BASE_DIR / '.env'
-if _env_path.exists():
-    with open(_env_path, encoding='utf-8-sig') as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith('DATABASE_URL='):
-                _db_url = line.split('=', 1)[1].strip().strip('"\'')
-                break
-if not _db_url:
-    _db_url = os.environ.get('DATABASE_URL')
-if _db_url:
-    # Support postgres:// and postgresql:// (Neon uses postgresql://)
-    if _db_url.startswith('postgres://'):
-        _db_url = 'postgresql://' + _db_url.split('://', 1)[1]
-    _parsed = urlparse(_db_url)
-    _db_name = _parsed.path.lstrip('/')
-    _db_query = _parsed.query
-    _host = _parsed.hostname or 'localhost'
-    _ssl_mode = 'require' if ('sslmode=require' in _db_query or 'neon.tech' in _host) else None
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': _db_name or 'datam_db',
-            'USER': unquote(_parsed.username) if _parsed.username else 'postgres',
-            'PASSWORD': unquote(_parsed.password) if _parsed.password else '',
-            'HOST': _host,
-            'PORT': str(_parsed.port) if _parsed.port else '5432',
-            **({'OPTIONS': {'sslmode': _ssl_mode}} if _ssl_mode else {}),
-        }
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DB_NAME', 'datam_db'),
-            'USER': os.environ.get('DB_USER', 'postgres'),
-            'PASSWORD': os.environ.get('DB_PASSWORD', '12345678'),
-            'HOST': os.environ.get('DB_HOST', 'localhost'),
-            'PORT': os.environ.get('DB_PORT', '5432'),
-        }
-    }
+# _db_url = None
+# _env_path = BASE_DIR / '.env'
+# if _env_path.exists():
+#     with open(_env_path, encoding='utf-8-sig') as f:
+#         for line in f:
+#             line = line.strip()
+#             if line.startswith('DATABASE_URL='):
+#                 _db_url = line.split('=', 1)[1].strip().strip('"\'')
+#                 break
+# if not _db_url:
+#     _db_url = os.environ.get('DATABASE_URL')
+# if _db_url:
+#     # Support postgres:// and postgresql:// (Neon uses postgresql://)
+#     if _db_url.startswith('postgres://'):
+#         _db_url = 'postgresql://' + _db_url.split('://', 1)[1]
+#     _parsed = urlparse(_db_url)
+#     _db_name = _parsed.path.lstrip('/')
+#     _db_query = _parsed.query
+#     _host = _parsed.hostname or 'localhost'
+#     _ssl_mode = 'require' if ('sslmode=require' in _db_query or 'neon.tech' in _host) else None
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.postgresql',
+#             'NAME': _db_name or 'datam_db',
+#             'USER': unquote(_parsed.username) if _parsed.username else 'postgres',
+#             'PASSWORD': unquote(_parsed.password) if _parsed.password else '',
+#             'HOST': _host,
+#             'PORT': str(_parsed.port) if _parsed.port else '5432',
+#             **({'OPTIONS': {'sslmode': _ssl_mode}} if _ssl_mode else {}),
+#         }
+#     }
+# else:
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.postgresql',
+#             'NAME': os.environ.get('DB_NAME', 'datam_db'),
+#             'USER': os.environ.get('DB_USER', 'postgres'),
+#             'PASSWORD': os.environ.get('DB_PASSWORD', '12345678'),
+#             'HOST': os.environ.get('DB_HOST', 'localhost'),
+#             'PORT': os.environ.get('DB_PORT', '5432'),
+#         }
+#     }
 
 
 # Password validation

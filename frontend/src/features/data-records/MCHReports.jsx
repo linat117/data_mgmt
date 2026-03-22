@@ -31,6 +31,8 @@ const MCHReports = ({ openModalRef }) => {
     const [regionFilter, setRegionFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
+    const [sortBy, setSortBy] = useState('created_at');
+    const [sortOrder, setSortOrder] = useState('desc');
 
     // Check if user is super admin
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -343,7 +345,11 @@ const MCHReports = ({ openModalRef }) => {
     const fetchReports = async () => {
         setFetchError('');
         try {
-            const res = await getAllReports();
+            const params = {
+                sort_by: sortBy,
+                sort_order: sortOrder
+            };
+            const res = await getAllReports(params);
             const list = Array.isArray(res.data) ? res.data : [];
             if (list.length > 0) {
                 setReports(list);
@@ -414,7 +420,7 @@ const MCHReports = ({ openModalRef }) => {
         fetchReports();
         fetchClients();
         fetchMentorMothers(); // Fetch mentor mothers on component load
-    }, []);
+    }, [sortBy, sortOrder]);
 
     // Update mentor mother names when reports are loaded
     useEffect(() => {
@@ -704,6 +710,25 @@ const MCHReports = ({ openModalRef }) => {
                                                     {name}
                                                 </option>
                                             ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-neutral-600 font-medium">Sort:</span>
+                                        <select
+                                            value={sortBy}
+                                            onChange={(e) => setSortBy(e.target.value)}
+                                            className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white"
+                                        >
+                                            <option value="created_at">Created Date</option>
+                                            <option value="date">Report Date</option>
+                                        </select>
+                                        <select
+                                            value={sortOrder}
+                                            onChange={(e) => setSortOrder(e.target.value)}
+                                            className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white"
+                                        >
+                                            <option value="desc">Newest First</option>
+                                            <option value="asc">Oldest First</option>
                                         </select>
                                     </div>
                                 </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getAllClients, createClient, updateClient, deleteClient, getMentorMothers, getClientFollowUps, createClientFollowUp, getAllReports, getAllPlans } from '../../services/recordService';
 import { useAuthStore } from '../../store/authStore';
-import { X, Eye, Pencil, Trash2, FileText } from 'lucide-react';
+import { X, Eye, Pencil, Trash2, FileText, Loader } from 'lucide-react';
 import { DATA_RECORD_SECTIONS, VALUE_LABELS, getLabelForValue } from './dataRecordFormStructure';
 import Pagination from '../../components/common/Pagination';
 import ExpandableFollowUpTable from '../../components/data-records/ExpandableFollowUpTable';
@@ -175,14 +175,21 @@ const ClientRegistrations = ({ openModalRef }) => {
     const [reportMch, setReportMch] = useState([]);
     const [reportPlans, setReportPlans] = useState([]);
     const [reportLoading, setReportLoading] = useState(false);
+    const [followUpLoading, setFollowUpLoading] = useState(null); // Track which client ID is loading
     const [followUpHistoryField, setFollowUpHistoryField] = useState(null);
     const [expandedFollowUps, setExpandedFollowUps] = useState(new Set());
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
+    const [sortBy, setSortBy] = useState('created_at');
+    const [sortOrder, setSortOrder] = useState('desc');
 
     const fetchClients = async () => {
         try {
-            const res = await getAllClients();
+            const params = {
+                sort_by: sortBy,
+                sort_order: sortOrder
+            };
+            const res = await getAllClients(params);
             setClients(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error(err);
@@ -202,7 +209,7 @@ const ClientRegistrations = ({ openModalRef }) => {
 
     useEffect(() => {
         fetchClients();
-    }, []);
+    }, [sortBy, sortOrder]);
 
     useEffect(() => {
         if (showModal) fetchMentorMothers();
@@ -542,6 +549,7 @@ const ClientRegistrations = ({ openModalRef }) => {
 
     const openFollowUp = async (client) => {
         try {
+            setFollowUpLoading(client.id);
             setFollowUpClient(client);
             setFollowUpForm({
                 notes: '',
@@ -559,6 +567,8 @@ const ClientRegistrations = ({ openModalRef }) => {
         } catch (err) {
             console.error('Failed to load follow-ups', err);
             alert('Failed to load follow-ups for this client.');
+        } finally {
+            setFollowUpLoading(null);
         }
     };
 
@@ -796,6 +806,27 @@ const ClientRegistrations = ({ openModalRef }) => {
                                         </select>
                                     </>
                                 )}
+                                <>
+                                    <span className="text-neutral-600 font-medium ml-0 sm:ml-2">Sort:</span>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white"
+                                    >
+                                        <option value="created_at">Created Date</option>
+                                        <option value="date">Registration Date</option>
+                                        <option value="name">Client Name</option>
+                                        <option value="folder_number">Folder Number</option>
+                                    </select>
+                                    <select
+                                        value={sortOrder}
+                                        onChange={(e) => setSortOrder(e.target.value)}
+                                        className="border border-neutral-300 rounded-md py-1 px-2 text-sm bg-white"
+                                    >
+                                        <option value="desc">Newest First</option>
+                                        <option value="asc">Oldest First</option>
+                                    </select>
+                                </>
                             </div>
                             <div className="mt-2 sm:mt-0">
                                 <input
@@ -832,7 +863,22 @@ const ClientRegistrations = ({ openModalRef }) => {
                                             <div className="flex items-center justify-end gap-1">
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); setViewClient(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="View"><Eye className="h-4 w-4" /></button>
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Edit"><Pencil className="h-4 w-4" /></button>
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); openFollowUp(client); }} className="px-2 py-1 text-xs border border-primary-500 text-primary-600 rounded hover:bg-primary-50" title="Add follow-up">Follow Up</button>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={(e) => { e.stopPropagation(); openFollowUp(client); }} 
+                                                    className="px-2 py-1 text-xs border border-primary-500 text-primary-600 rounded hover:bg-primary-50 flex items-center gap-1 min-w-[70px] justify-center" 
+                                                    title="Add follow-up"
+                                                    disabled={followUpLoading === client.id}
+                                                >
+                                                    {followUpLoading === client.id ? (
+                                                        <>
+                                                            <Loader className="h-3 w-3 animate-spin" />
+                                                            Loading...
+                                                        </>
+                                                    ) : (
+                                                        'Follow Up'
+                                                    )}
+                                                </button>
                                                 {/* <button type="button" onClick={(e) => { e.stopPropagation(); openReport(client); }} className="p-1.5 text-neutral-500 hover:text-primary-600 rounded" title="Client report"><FileText className="h-4 w-4" /></button> */}
                                                 <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete(client); }} className="p-1.5 text-neutral-500 hover:text-red-600 rounded" title="Delete"><Trash2 className="h-4 w-4" /></button>
                                             </div>

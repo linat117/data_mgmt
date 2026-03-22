@@ -59,6 +59,8 @@ const Users = () => {
     const [roleFilter, setRoleFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
+    const [sortBy, setSortBy] = useState('created_at');
+    const [sortOrder, setSortOrder] = useState('desc');
 
     const fetchUsers = async () => {
         try {
@@ -360,6 +362,26 @@ const Users = () => {
                                 <option value="SUPER_ADMIN">Super Admin</option>
                                 <option value="PM">Project Manager</option>
                                 <option value="MENTOR_MOTHER">Mentor Mother</option>
+                            </select>
+                            <span className="text-neutral-600 font-medium ml-3">Sort:</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="border border-neutral-300 rounded-md py-1 px-2 bg-white text-sm"
+                            >
+                                <option value="created_at">Created Date</option>
+                                <option value="email">Email</option>
+                                <option value="first_name">First Name</option>
+                                <option value="last_name">Last Name</option>
+                                <option value="role">Role</option>
+                            </select>
+                            <select
+                                value={sortOrder}
+                                onChange={(e) => setSortOrder(e.target.value)}
+                                className="border border-neutral-300 rounded-md py-1 px-2 bg-white text-sm"
+                            >
+                                <option value="desc">Newest First</option>
+                                <option value="asc">Oldest First</option>
                             </select>
                         </div>
                         <table className="min-w-full divide-y divide-neutral-200">

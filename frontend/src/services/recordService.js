@@ -6,9 +6,16 @@ export const getMentorMothers = () => api.get('/records/mentor-mothers/');
 export const getClients = () => api.get('/records/clients/');
 
 /** Fetch all client registrations across pages (for building MCH list from registrations). */
-export const getAllClients = async () => {
+export const getAllClients = async (params = {}) => {
     const all = [];
     let nextUrl = '/records/clients/';
+    
+    // Add query parameters to the first request
+    const queryString = new URLSearchParams(params).toString();
+    if (queryString) {
+        nextUrl += `?${queryString}`;
+    }
+    
     while (nextUrl) {
         const res = await api.get(nextUrl);
         const data = res.data;
@@ -33,9 +40,16 @@ export const createClientFollowUp = (data) => api.post('/records/client-followup
 export const getReports = () => api.get('/records/mch-reports/');
 
 /** Fetch all MCH reports across pages (for list view so admin sees all registered reports). */
-export const getAllReports = async () => {
+export const getAllReports = async (params = {}) => {
     const all = [];
     let nextUrl = '/records/mch-reports/';
+    
+    // Add query parameters to the first request
+    const queryString = new URLSearchParams(params).toString();
+    if (queryString) {
+        nextUrl += `?${queryString}`;
+    }
+    
     while (nextUrl) {
         const res = await api.get(nextUrl);
         const data = res.data;
@@ -53,9 +67,16 @@ export const deleteReport = (id) => api.delete(`/records/mch-reports/${id}/`);
 export const getPlans = () => api.get('/records/weekly-plans/');
 
 /** Fetch all weekly plans across pages (for dashboard charts). */
-export const getAllPlans = async () => {
+export const getAllPlans = async (params = {}) => {
     const all = [];
     let nextUrl = '/records/weekly-plans/';
+    
+    // Add query parameters to the first request
+    const queryString = new URLSearchParams(params).toString();
+    if (queryString) {
+        nextUrl += `?${queryString}`;
+    }
+    
     while (nextUrl) {
         const res = await api.get(nextUrl);
         const data = res.data;

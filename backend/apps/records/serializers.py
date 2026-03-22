@@ -110,6 +110,9 @@ class ClientRegistrationSerializer(serializers.ModelSerializer):
 class ClientFollowUpSerializer(serializers.ModelSerializer):
     created_by_email = serializers.SerializerMethodField(read_only=True)
     created_by_name = serializers.SerializerMethodField(read_only=True)
+    created_by_role = serializers.SerializerMethodField(read_only=True)
+    client_name = serializers.SerializerMethodField(read_only=True)
+    client_folder_number = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ClientFollowUp
@@ -121,6 +124,28 @@ class ClientFollowUpSerializer(serializers.ModelSerializer):
 
     def get_created_by_name(self, obj):
         return get_created_by_name(obj)
+
+    def get_created_by_role(self, obj):
+        """Get the role of the user who created this follow-up"""
+        user = getattr(obj, "created_by", None)
+        if not user:
+            return None
+        return getattr(user, "role", None)
+
+    def get_client_name(self, obj):
+        """Get client name for display"""
+        client = getattr(obj, "client", None)
+        if not client:
+            return None
+        # ClientRegistration model has a 'name' field, not first_name/last_name
+        return getattr(client, "name", "Unknown Client")
+
+    def get_client_folder_number(self, obj):
+        """Get client folder number for display"""
+        client = getattr(obj, "client", None)
+        if not client:
+            return None
+        return getattr(client, "folder_number", None)
 
 
 class MCHReportSerializer(serializers.ModelSerializer):

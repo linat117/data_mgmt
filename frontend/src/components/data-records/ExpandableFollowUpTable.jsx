@@ -104,10 +104,10 @@ const ExpandableFollowUpTable = ({ followups }) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {followup.client?.name || 'Unknown Client'}
+                      {followup.client_name || 'Unknown Client'}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {followup.client?.folder_number || ''}
+                      {followup.client_folder_number || ''}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -115,10 +115,10 @@ const ExpandableFollowUpTable = ({ followups }) => {
                       <User className="w-4 h-4 mr-2 text-gray-400" />
                       <div>
                         <div className="text-sm text-gray-900">
-                          {followup.created_by?.email || 'Unknown'}
+                          {followup.created_by_name || followup.created_by_email || 'Unknown'}
                         </div>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadgeColor(followup.created_by?.role)}`}>
-                          {followup.created_by?.role || 'Unknown'}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadgeColor(followup.created_by_role)}`}>
+                          {followup.created_by_role || 'Unknown'}
                         </span>
                       </div>
                     </div>

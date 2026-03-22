@@ -48,7 +48,21 @@ class BaseMCHViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = records_queryset_for_user(self.queryset.model, self.request.user)
-        return qs.order_by("-created_at").select_related("created_by", "created_by__region")
+        
+        # Handle sorting
+        sort_by = self.request.query_params.get('sort_by', 'created_at')
+        sort_order = self.request.query_params.get('sort_order', 'desc')
+        
+        # Validate sort field
+        allowed_fields = ['created_at', 'date', 'name', 'folder_number']
+        if sort_by not in allowed_fields:
+            sort_by = 'created_at'
+            
+        # Apply sorting
+        sort_prefix = '-' if sort_order == 'desc' else ''
+        qs = qs.order_by(f"{sort_prefix}{sort_by}").select_related("created_by", "created_by__region")
+        
+        return qs
 
     def perform_create(self, serializer):
         instance = serializer.save(created_by=self.request.user)
@@ -69,9 +83,23 @@ class ClientRegistrationViewSet(BaseMCHViewSet):
 
     def get_queryset(self):
         qs = records_queryset_for_user(self.queryset.model, self.request.user)
-        return qs.order_by("-created_at").select_related("created_by", "created_by__region").prefetch_related(
+        
+        # Handle sorting
+        sort_by = self.request.query_params.get('sort_by', 'created_at')
+        sort_order = self.request.query_params.get('sort_order', 'desc')
+        
+        # Validate sort field - include client-specific fields
+        allowed_fields = ['created_at', 'date', 'name', 'folder_number']
+        if sort_by not in allowed_fields:
+            sort_by = 'created_at'
+            
+        # Apply sorting
+        sort_prefix = '-' if sort_order == 'desc' else ''
+        qs = qs.order_by(f"{sort_prefix}{sort_by}").select_related("created_by", "created_by__region").prefetch_related(
             "followups__created_by", "followups__created_by__region"
         )
+        
+        return qs
 
     def perform_create(self, serializer):
         """
@@ -158,7 +186,20 @@ class ClientFollowUpViewSet(BaseMCHViewSet):
                 # For other roles, only filter within their accessible records
                 qs = qs.filter(created_by_id=created_by)
         
-        return qs.order_by("-created_at").select_related("created_by", "created_by__region", "client", "client__created_by", "client__created_by__region")
+        # Handle sorting
+        sort_by = self.request.query_params.get('sort_by', 'created_at')
+        sort_order = self.request.query_params.get('sort_order', 'desc')
+        
+        # Validate sort field
+        allowed_fields = ['created_at', 'date']
+        if sort_by not in allowed_fields:
+            sort_by = 'created_at'
+            
+        # Apply sorting
+        sort_prefix = '-' if sort_order == 'desc' else ''
+        qs = qs.order_by(f"{sort_prefix}{sort_by}").select_related("created_by", "created_by__region", "client", "client__created_by", "client__created_by__region")
+        
+        return qs
 
 
 def mentor_mother_names_queryset(request):

@@ -24,10 +24,16 @@ const WeeklyPlans = ({ openModalRef }) => {
     });
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
+    const [sortBy, setSortBy] = useState('created_at');
+    const [sortOrder, setSortOrder] = useState('desc');
 
     const fetchPlans = async () => {
         try {
-            const res = await getAllPlans();
+            const params = {
+                sort_by: sortBy,
+                sort_order: sortOrder
+            };
+            const res = await getAllPlans(params);
             setPlans(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error(err);
@@ -47,7 +53,7 @@ const WeeklyPlans = ({ openModalRef }) => {
 
     useEffect(() => {
         fetchPlans();
-    }, []);
+    }, [sortBy, sortOrder]);
 
     useEffect(() => {
         if (showModal) fetchMentorMothers();
@@ -153,6 +159,25 @@ const WeeklyPlans = ({ openModalRef }) => {
                     <div className="p-4 text-center text-neutral-500">Loading...</div>
                 ) : (
                     <div className="overflow-x-auto -mx-3 sm:mx-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+                        <div className="px-3 pt-3 pb-2 sm:px-6 flex items-center gap-3 text-sm">
+                            <span className="text-neutral-600 font-medium">Sort:</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="border border-neutral-300 rounded-md py-1 px-2 bg-white text-sm"
+                            >
+                                <option value="created_at">Created Date</option>
+                                <option value="date">Plan Date</option>
+                            </select>
+                            <select
+                                value={sortOrder}
+                                onChange={(e) => setSortOrder(e.target.value)}
+                                className="border border-neutral-300 rounded-md py-1 px-2 bg-white text-sm"
+                            >
+                                <option value="desc">Newest First</option>
+                                <option value="asc">Oldest First</option>
+                            </select>
+                        </div>
                         <table className="min-w-full divide-y divide-neutral-200">
                             <thead className="bg-neutral-50">
                                 <tr>
