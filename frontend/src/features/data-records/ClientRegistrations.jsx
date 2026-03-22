@@ -168,6 +168,7 @@ const ClientRegistrations = ({ openModalRef }) => {
         counseling_given: '',
         anything_additional: '',
         problem_faced_by_mm: '',
+        images: [], // Store multiple images
     });
     const [viewFollowUpDetail, setViewFollowUpDetail] = useState(null);
     const [reportClient, setReportClient] = useState(null);
@@ -559,6 +560,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                 counseling_given: client.counseling_given || '',
                 anything_additional: client.anything_additional || '',
                 problem_faced_by_mm: client.problem_faced_by_mm || '',
+                images: [], // Reset images for new follow-up
             });
             const res = await getClientFollowUps(client.id);
             const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
@@ -577,6 +579,23 @@ const ClientRegistrations = ({ openModalRef }) => {
         setFollowUpForm((prev) => ({ ...prev, [name]: value }));
     };
 
+    const handleImageUpload = (e) => {
+        const files = Array.from(e.target.files);
+        const validImages = files.filter(file => file.type.startsWith('image/'));
+        
+        setFollowUpForm((prev) => ({
+            ...prev,
+            images: [...prev.images, ...validImages]
+        }));
+    };
+
+    const removeImage = (index) => {
+        setFollowUpForm((prev) => ({
+            ...prev,
+            images: prev.images.filter((_, i) => i !== index)
+        }));
+    };
+
     const saveFollowUp = async (e) => {
         e.preventDefault();
         if (!followUpClient) return;
@@ -592,6 +611,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                     anything_additional: followUpForm.anything_additional || '',
                     problem_faced_by_mm: followUpForm.problem_faced_by_mm || '',
                 },
+                images: followUpForm.images, // Include images in payload
             };
             const res = await createClientFollowUp(payload);
             const created = res.data;
@@ -600,7 +620,7 @@ const ClientRegistrations = ({ openModalRef }) => {
                 return { ...prev, [followUpClient.id]: [created, ...existing] };
             });
             fetchClients();
-            setFollowUpForm((prev) => ({ ...prev, notes: '' }));
+            setFollowUpForm((prev) => ({ ...prev, notes: '', images: [] })); // Reset both notes and images
         } catch (err) {
             console.error('Failed to save follow-up', err);
             alert('Failed to save follow-up.');
@@ -1416,6 +1436,54 @@ const ClientRegistrations = ({ openModalRef }) => {
                                             rows={2}
                                             className="mt-1 block w-full border border-neutral-300 rounded-md sm:text-sm py-2 px-3"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center text-sm font-medium text-neutral-700 mb-2">
+                                            Images
+                                        </label>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    accept="image/*"
+                                                    onChange={handleImageUpload}
+                                                    className="hidden"
+                                                    id="follow-up-images"
+                                                />
+                                                <label
+                                                    htmlFor="follow-up-images"
+                                                    className="px-3 py-2 border border-neutral-300 rounded-md text-sm text-neutral-700 hover:bg-neutral-50 cursor-pointer flex items-center gap-2"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    Add Images
+                                                </label>
+                                            </div>
+                                            {followUpForm.images.length > 0 && (
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                                    {followUpForm.images.map((image, index) => (
+                                                        <div key={index} className="relative group">
+                                                            <img
+                                                                src={URL.createObjectURL(image)}
+                                                                alt={`Upload ${index + 1}`}
+                                                                className="w-full h-24 object-cover rounded-md border border-neutral-200"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeImage(index)}
+                                                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex justify-end gap-2 pt-2">
                                         <button
