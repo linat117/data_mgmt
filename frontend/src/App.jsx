@@ -9,6 +9,7 @@ import Dashboard from './features/dashboard/Dashboard';
 import Records from './features/data-records/Records';
 import Users from './features/auth/Users';
 import UserDetail from './features/auth/UserDetail';
+import Profile from './features/auth/Profile';
 import AuditLogs from './features/audit-logs/AuditLogs';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/records/*" element={<Records />} />
+            <Route path="/profile" element={<Profile />} />
 
             {/* Users: Super Admin and PM */}
             <Route element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'PM']} />}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { LayoutDashboard, Users, FileText, Activity, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Activity, LogOut, Menu, X, User } from 'lucide-react';
 
 const SidebarLink = ({ to, icon, label, currentPath, onClick }) => {
     const isActive = currentPath === to || currentPath.startsWith(`${to}/`);
@@ -57,6 +57,7 @@ const Layout = () => {
                 <nav className="mt-8 flex-1 px-2 space-y-2">
                     <SidebarLink to="/dashboard" icon={<LayoutDashboard />} label="Dashboard" currentPath={location.pathname} onClick={closeSidebar} />
                     <SidebarLink to="/records" icon={<FileText />} label="Data Records" currentPath={location.pathname} onClick={closeSidebar} />
+                    <SidebarLink to="/profile" icon={<User />} label="Profile" currentPath={location.pathname} onClick={closeSidebar} />
                     {canManageUsers && (
                         <SidebarLink to="/users" icon={<Users />} label="Users" currentPath={location.pathname} onClick={closeSidebar} />
                     )}
@@ -74,9 +75,19 @@ const Layout = () => {
                                 {roleLabel()}
                             </p>
                         </div>
-                        <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-white transition-colors flex-shrink-0" title="Logout">
-                            <LogOut className="h-5 w-5" />
-                        </button>
+                        <div className="flex items-center space-x-1">
+                            <Link 
+                                to="/profile" 
+                                className="p-2 text-neutral-400 hover:text-white transition-colors flex-shrink-0" 
+                                title="Profile"
+                                onClick={closeSidebar}
+                            >
+                                <User className="h-5 w-5" />
+                            </Link>
+                            <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-white transition-colors flex-shrink-0" title="Logout">
+                                <LogOut className="h-5 w-5" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -17,6 +17,7 @@ export const useAuthStore = create(
 
             setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken, isAuthenticated: true }),
             setUser: (user) => set({ user }),
+            updateProfile: (updatedUser) => set({ user: { ...get().user, ...updatedUser } }),
             logout: () => set({ accessToken: null, refreshToken: null, user: null, isAuthenticated: false }),
 
             roleLabel: () => ROLE_LABELS[get().user?.role] || get().user?.role || '',
