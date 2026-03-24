@@ -75,19 +75,9 @@ const Layout = () => {
                                 {roleLabel()}
                             </p>
                         </div>
-                        <div className="flex items-center space-x-1">
-                            <Link 
-                                to="/profile" 
-                                className="p-2 text-neutral-400 hover:text-white transition-colors flex-shrink-0" 
-                                title="Profile"
-                                onClick={closeSidebar}
-                            >
-                                <User className="h-5 w-5" />
-                            </Link>
-                            <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-white transition-colors flex-shrink-0" title="Logout">
-                                <LogOut className="h-5 w-5" />
-                            </button>
-                        </div>
+                        <button onClick={handleLogout} className="p-2 text-neutral-400 hover:text-white transition-colors flex-shrink-0" title="Logout">
+                            <LogOut className="h-5 w-5" />
+                        </button>
                     </div>
                 </div>
             </div>
