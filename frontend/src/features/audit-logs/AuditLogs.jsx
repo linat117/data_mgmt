@@ -14,6 +14,7 @@ const AuditLogs = () => {
         const fetchLogs = async () => {
             try {
                 const res = await getAuditLogs();
+                console.log('Audit logs data:', res.data); // Debug log
                 setLogs(res.data.results || res.data);
             } catch (err) {
                 console.error('Failed to fetch audit logs', err);
@@ -97,11 +98,16 @@ const AuditLogs = () => {
                                             {log.user_display || 'System'}
                                         </td>
                                         <td className="px-3 py-3 whitespace-normal text-sm text-neutral-700 sm:px-6 sm:py-4">
+                                            {console.log('Log entry:', log)} {/* Debug log */}
                                             {log.description || (
                                                 <>
                                                     <span className="font-semibold">{log.action}</span>{' '}
                                                     on <span className="font-mono text-xs">{log.table_name}</span>
-                                                    {log.record_id && <> (record {log.record_id})</>}
+                                                    {log.record_id && (
+                                                        <span className="text-xs text-neutral-500">
+                                                            {' '}(ID: {log.record_id.substring(0, 8)}...)
+                                                        </span>
+                                                    )}
                                                 </>
                                             )}
                                         </td>
