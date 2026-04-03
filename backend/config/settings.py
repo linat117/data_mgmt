@@ -54,6 +54,12 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
     SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'True').lower() in ('true', '1', 'yes')
     SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'True').lower() in ('true', '1', 'yes')
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# CSRF trusted origins
+_CSRF_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if _CSRF_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _CSRF_ORIGINS.split(',') if o.strip()]
 
 # ALLOWED_HOSTS: use RENDER_EXTERNAL_HOSTNAME on Render, merge with env
 _ALLOWED = os.environ.get('ALLOWED_HOSTS', '').strip()
